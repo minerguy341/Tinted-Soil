@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.minerguy341.tintedsoil.mixin.client",
+  "compatibilityLevel": "${java}",
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "client": [
+    "ClientLevelMixin"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "replace": false,
+  "values": [
+    "minecraft:dirt",
+    {
+      "id": "biomeswevegone:lush_dirt",
+      "required": false
+    },
+    {
+      "id": "biomeswevegone:sandy_dirt",
+      "required": false
+    },
+    {
+      "id": "biomeswevegone:peat",
+      "required": false
+    }
+  ]
+}

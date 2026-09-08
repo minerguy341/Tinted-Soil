@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.minerguy341.tintedsoil.mixin",
+  "compatibilityLevel": "${java}",
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "mixins": [
+    "BiomeMixin",
+    "ClimateSettingsMixin",
+    "HoeItemAccessor",
+    "ProtoChunkMixin",
+    "ShovelItemAccessor",
+    "SpreadingSnowyDirtBlockInvoker"
+  ]
+}

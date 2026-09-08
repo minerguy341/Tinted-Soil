@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "${id}",
+  "version": "${version}",
+  "name": "${name}",
+  "description": "Replaces vanilla and worldgen-mod grass/dirt with two biome-tinted blocks, so soil and grass blend smoothly across biome borders instead of cutting off hard.",
+  "authors": [
+    "minerguy341"
+  ],
+  "contact": {
+    "sources": "https://github.com/minerguy341/Tinted-Soil",
+    "issues": "https://github.com/minerguy341/Tinted-Soil/issues"
+  },
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.minerguy341.tintedsoil.TintedSoilFabric"
+    ],
+    "client": [
+      "com.minerguy341.tintedsoil.client.TintedSoilFabricClient"
+    ]
+  },
+  "mixins": [
+    "tintedsoil.mixins.json",
+    {
+      "config": "tintedsoil.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=0.15",
+    "minecraft": "${minecraft}",
+    "fabric-api": "*"
+  }
+}

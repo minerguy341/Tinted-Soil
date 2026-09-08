@@ -1,0 +1,21 @@
+package com.minerguy341.tintedsoil.mixin;
+
+import com.mojang.datafixers.util.Pair;
+import net.minecraft.world.item.HoeItem;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.block.Block;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.gen.Accessor;
+
+import java.util.Map;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+
+/** Companion to {@link ShovelItemAccessor} for hoe tilling. */
+@Mixin(HoeItem.class)
+public interface HoeItemAccessor {
+    @Accessor("TILLABLES")
+    static Map<Block, Pair<Predicate<UseOnContext>, Consumer<UseOnContext>>> tintedsoil$getTillables() {
+        throw new AssertionError("mixin not applied");
+    }
+}

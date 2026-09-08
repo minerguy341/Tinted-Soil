@@ -1,0 +1,14 @@
+{
+  "replace": false,
+  "values": [
+    "minecraft:grass_block",
+    {
+      "id": "biomesoplenty:origin_grass_block",
+      "required": false
+    },
+    {
+      "id": "biomeswevegone:lush_grass_block",
+      "required": false
+    }
+  ]
+}
