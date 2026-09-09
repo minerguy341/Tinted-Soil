@@ -21,6 +21,7 @@ public final class TintedSoilNeoForgeClient {
         modEventBus.addListener(RegisterColorHandlersEvent.Block.class,
                 event -> TintedSoilColors.registerBlockColors(event::register));
         LegacyItemColors.registerNeoForge(modEventBus);
+        SoilSpriteSources.register();
     }
 }
 *///?}

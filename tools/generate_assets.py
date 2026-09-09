@@ -2,7 +2,7 @@
 """
 Regenerates Tinted Soil's two generated assets:
 
-  assets/tintedsoil/textures/block/tinted_soil.png   16x16 neutral soil texture
+  assets/tintedsoil/textures/block/tinted_dirt.png   16x16 neutral soil texture
   assets/tintedsoil/textures/colormap/soil.png       256x256 biome soil colormap
 
 Both are procedural and deterministic, so the repository never has to carry
@@ -15,7 +15,7 @@ Why the texture is nearly white
 Block tints are multiplicative: the rendered colour is `texel * tint / 255`, so a
 texture can only ever be darkened. Vanilla `dirt.png` is a saturated brown, which
 means no tint can push it towards pale sand. The generated texture is therefore a
-light, desaturated grain (mean luminance MEAN_LUMINANCE) that carries the *pattern*
+vanilla's own grain, with the brown divided out, that carries the *pattern*
 only, and the colormap carries all of the colour -- exactly how vanilla treats
 `grass_block_top.png` and `grass.png`.
 """
@@ -28,8 +28,6 @@ import zlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS = os.path.join(ROOT, "src", "main", "resources", "assets", "tintedsoil", "textures")
-TEXTURE_PATH = os.path.join(ASSETS, "block", "tinted_soil.png")
-COARSE_TEXTURE_PATH = os.path.join(ASSETS, "block", "tinted_coarse_soil.png")
 COLORMAP_PATH = os.path.join(ASSETS, "colormap", "soil.png")
 
 # --- Colour model ------------------------------------------------------------
@@ -37,14 +35,24 @@ COLORMAP_PATH = os.path.join(ASSETS, "colormap", "soil.png")
 # luminance is divided out. Keep them in this space -- it is the only space that
 # is easy to eyeball against a screenshot.
 
-TEMPERATE = (134, 96, 67)    # #866043 - vanilla dirt, the reference point
+# The mean of vanilla's own dirt.png, read out of the 1.21.1 client jar. Plains is where it
+# has to land: it is the biome players read as plain dirt, so matching it there is what
+# makes replaced ground indistinguishable from untouched ground across most of a world.
+#
+# This is the mean of the 249 *chromatic* pixels only, not all 256. Vanilla's other 7 are
+# grey pebbles, and those are reproduced literally by the pebble overlay rather than by the
+# tint -- so the tinted part has to match the part of vanilla dirt it actually stands in
+# for. Matching the all-256 mean here would double-count the pebbles and skew every biome.
+VANILLA_DIRT = (134.5542, 95.5341, 65.4137)
+
+# Mean luminance SoilSpriteSource derives from vanilla 1.21.1 dirt.png, confirmed from a
+# running client. Mirrored by SoilTextures.DEFAULT_MEAN_LUMINANCE.
+VANILLA_MEAN_LUMINANCE = 0.7232
+PLAINS_TEMPERATURE, PLAINS_DOWNFALL = 0.8, 0.4
+
 HUMID = (104, 72, 46)        # #684832 - wet soil: jungle, swamp, dark forest
 SAND = (206, 183, 138)       # #CEB78A - hot and rainless: desert, badlands, savanna
 COLD = (146, 138, 128)       # #928A80 - frozen and washed out: snowy and peak biomes
-
-# Mean luminance of the generated texture. Must stay above max(SAND)/255 = 0.808
-# or the sandy end of the colormap clips against the 8-bit ceiling.
-MEAN_LUMINANCE = 0.86
 
 # Shaping exponents. `SAND_TEMP_EXP`/`SAND_DRY_EXP` keep merely-dryish temperate
 # biomes (plains sits at downfall 0.4) from drifting towards sand; only genuinely
@@ -58,19 +66,42 @@ def lerp(a, b, t):
     return tuple(a[i] + (b[i] - a[i]) * t for i in range(3))
 
 
-def soil_color(temperature, downfall):
+def soil_color(temperature, downfall, temperate=None):
     """Rendered soil colour for a clamped biome temperature/downfall pair."""
     t = min(max(temperature, 0.0), 1.0)
     d = min(max(downfall, 0.0), 1.0)
 
-    base = lerp(TEMPERATE, HUMID, d)
+    base = lerp(TEMPERATE_DRY if temperate is None else temperate, HUMID, d)
     sand = (t ** SAND_TEMP_EXP) * ((1.0 - d) ** SAND_DRY_EXP)
     base = lerp(base, SAND, sand)
     cold = (1.0 - t) ** COLD_EXP
     return lerp(base, COLD, cold)
 
 
-# --- Minimal PNG writer ------------------------------------------------------
+def solve_temperate_dry():
+    """
+    The dry-temperate anchor is derived, not chosen.
+
+    Plains is not a corner of the model: at downfall 0.4 its colour is already part way
+    along the humid lerp, and it picks up a little sand and a little cold on top. So
+    setting the anchor to vanilla dirt does *not* make plains render as vanilla dirt --
+    that is what this used to do, and plains came out at #876749 instead of #866043.
+
+    Everything downstream of the anchor is a chain of lerps, which is affine in it, so
+    exactly one anchor value lands plains on VANILLA_DIRT. Probing the chain with black
+    and white recovers that affine map rather than restating its algebra here, which keeps
+    the calibration correct if the other anchors or the shaping exponents are ever retuned.
+    """
+    lo = soil_color(PLAINS_TEMPERATURE, PLAINS_DOWNFALL, temperate=(0.0, 0.0, 0.0))
+    hi = soil_color(PLAINS_TEMPERATURE, PLAINS_DOWNFALL, temperate=(255.0, 255.0, 255.0))
+    return tuple(255.0 * (VANILLA_DIRT[i] - lo[i]) / (hi[i] - lo[i]) for i in range(3))
+
+
+TEMPERATE_DRY = solve_temperate_dry()
+
+
+PNG_MAGIC = bytes((0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A))
+
 
 def write_png(path, width, height, rgb_rows):
     """Writes 8-bit RGB PNG. `rgb_rows` is a list of rows of (r, g, b) tuples."""
@@ -84,7 +115,7 @@ def write_png(path, width, height, rgb_rows):
         out = struct.pack(">I", len(data)) + tag + data
         return out + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
 
-    png = b"\x89PNG\r\n\x1a\n"
+    png = PNG_MAGIC
     png += chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
     png += chunk(b"IDAT", zlib.compress(bytes(raw), 9))
     png += chunk(b"IEND", b"")
@@ -92,74 +123,6 @@ def write_png(path, width, height, rgb_rows):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as fh:
         fh.write(png)
-
-
-# --- Deterministic noise -----------------------------------------------------
-
-class Rng:
-    """Small fixed LCG so regenerating never produces a different texture."""
-
-    def __init__(self, seed):
-        self.state = seed & 0xFFFFFFFF
-
-    def next(self):
-        self.state = (1103515245 * self.state + 12345) & 0x7FFFFFFF
-        return self.state
-
-    def unit(self):
-        return self.next() / 0x7FFFFFFF
-
-
-def generate_texture(size=16, seed=0x50494C21, clump=2, levels=6, spread=0.24):
-    """
-    Light, desaturated granular soil: blocky clumps plus per-pixel speckle.
-
-    `clump` is the width of a coherent patch in pixels and `spread` the peak-to-peak
-    luminance range, so raising both gives the chunkier, higher-contrast grain used for
-    coarse soil. Whatever the settings, the result is normalised to MEAN_LUMINANCE, which
-    is what lets one colormap serve every soil texture.
-    """
-    rng = Rng(seed)
-
-    cells = max(1, size // clump)
-    patches = [[rng.unit() for _ in range(cells)] for _ in range(cells)]
-    field = []
-    for y in range(size):
-        row = []
-        for x in range(size):
-            patch = patches[min(y // clump, cells - 1)][min(x // clump, cells - 1)]
-            row.append(0.55 * patch + 0.45 * rng.unit())
-        field.append(row)
-
-    # Quantise to a handful of shades so it reads as pixel art rather than noise.
-    quantised = [[round(v * (levels - 1)) / (levels - 1) for v in row] for row in field]
-
-    flat = [v for row in quantised for v in row]
-    mean = sum(flat) / len(flat)
-
-    rows = []
-    for row in quantised:
-        out = []
-        for v in row:
-            lum = MEAN_LUMINANCE + (v - mean) * spread
-            lum = min(max(lum, 0.0), 1.0)
-            # Strictly neutral: R == G == B. Any hue baked in here would multiply against
-            # the tint and pull every biome's soil toward it, so all colour comes from the
-            # colormap and none from the texture.
-            value = int(round(lum * 255))
-            out.append((value, value, value))
-        rows.append(out)
-    return rows
-
-
-def texture_mean_luminance(rows):
-    total = 0.0
-    count = 0
-    for row in rows:
-        for r, g, b in row:
-            total += (r + g + b) / 3.0 / 255.0
-            count += 1
-    return total / count
 
 
 # --- Colormap ----------------------------------------------------------------
@@ -207,8 +170,8 @@ import json
 RESOURCES = os.path.join(ROOT, "src", "main", "resources")
 NS = "tintedsoil"
 GRASS = NS + ":tinted_grass_block"
-SOIL = NS + ":tinted_soil"
-COARSE = NS + ":tinted_coarse_soil"
+SOIL = NS + ":tinted_dirt"
+COARSE = NS + ":tinted_coarse_dirt"
 
 # Verified against the shipped jars of each mod rather than guessed:
 #   biomesoplenty:origin_grass_block   - the only grass/dirt block BOP adds
@@ -290,6 +253,19 @@ def vanilla_tags():
 TAG_DIRS = ["tags/block", "tags/blocks"]        # 1.21+, 1.20.x
 LOOT_DIRS = ["loot_table", "loot_tables"]       # 1.21+, 1.20.x
 
+# The grass block renders in the cutout layer so the side overlay's transparent pixels
+# stay transparent. Mipmapped rather than plain cutout, so the fringe does not alias into
+# noise at distance -- the same layer vanilla uses for leaves.
+#
+# NeoForge reads this field straight out of the model. Fabric API has no equivalent (it
+# has no model-JSON render type at all), so on Fabric the layer is registered per block in
+# TintedSoilFabricClient, which is why every model of the block carries the same value
+# here: Fabric applies its choice to all of them regardless.
+RENDER_TYPE = "minecraft:cutout_mipped"
+
+# Item icons render a single model, so the grass block's two halves are recombined.
+INVENTORY_MODEL = {"tinted_grass_block": "tinted_grass_block_inventory"}
+
 
 def write_json(path, data):
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -345,7 +321,7 @@ def write_loot_tables():
         base = os.path.join(RESOURCES, "data", NS, directory, "blocks")
 
         # Bare soil simply drops itself.
-        for name, item in (("tinted_soil", SOIL), ("tinted_coarse_soil", COARSE)):
+        for name, item in (("tinted_dirt", SOIL), ("tinted_coarse_dirt", COARSE)):
             write_json(os.path.join(base, name + ".json"), {
                 "type": "minecraft:block",
                 "random_sequence": NS + ":blocks/" + name,
@@ -389,48 +365,87 @@ def cube_faces(texture, tint=None, cullface=True, faces=None):
 
 def write_models():
     models = os.path.join(RESOURCES, "assets", NS, "models")
-    soil_texture = NS + ":block/tinted_soil"
+    soil_texture = NS + ":block/tinted_dirt"
 
     # Vanilla's dirt model has no tint index, so the cube is spelled out here instead of
     # inheriting cube_all. Tint index 1 is soil throughout the mod.
-    for name in ("tinted_soil", "tinted_coarse_soil"):
+    for name in ("tinted_dirt", "tinted_coarse_dirt"):
         texture = NS + ":block/" + name
+        pebbles = texture + "_pebbles"
         write_json(os.path.join(models, "block", name + ".json"), {
             "parent": "minecraft:block/block",
-            "textures": {"particle": texture, "all": texture},
-            "elements": [{"from": [0, 0, 0], "to": [16, 16, 16],
-                          "faces": cube_faces("#all", tint=1)}],
+            "render_type": RENDER_TYPE,
+            "textures": {"particle": texture, "all": texture, "pebbles": pebbles},
+            "elements": [
+                {"from": [0, 0, 0], "to": [16, 16, 16],
+                 "faces": cube_faces("#all", tint=1)},
+                # No tint index: the pebbles are stone, and stone does not take on the
+                # colour of the soil around it. Leaving them untinted is what keeps them
+                # the same grey in a swamp as in a desert, exactly as vanilla's are.
+                {"from": [0, 0, 0], "to": [16, 16, 16],
+                 "faces": cube_faces("#pebbles")},
+            ],
         })
 
-    # Same two-element structure as minecraft:block/grass_block: an opaque cube plus a
-    # grass overlay on the four sides. The difference is that the dirt half is tinted
-    # (index 1) instead of being a fixed brown, and the sides use the neutral soil
-    # texture rather than the pre-composited grass_block_side.
+    # Vanilla packs the soil cube and the grass overlay into one model. That cannot work
+    # here: vanilla's `#side` is the pre-composited grass_block_side, so its overlay only
+    # ever adds colour on top of pixels that are already grass, and the block stays in the
+    # solid layer. This mod's `#side` is bare soil, so the overlay's transparent pixels are
+    # the whole point -- and in the solid layer alpha is ignored, which paints them opaque
+    # black over the soil. So the overlay is its own model, carrying the cutout render type,
+    # and the blockstate stacks it on top of the soil cube.
+    grass_textures = {
+        "particle": soil_texture,
+        "bottom": soil_texture,
+        "side": soil_texture,
+        "top": "minecraft:block/grass_block_top",
+        "overlay": "minecraft:block/grass_block_side_overlay",
+    }
+    soil_cube = {"from": [0, 0, 0], "to": [16, 16, 16], "faces": {
+        "down": {"uv": [0, 0, 16, 16], "texture": "#bottom", "cullface": "down", "tintindex": 1},
+        "up": {"uv": [0, 0, 16, 16], "texture": "#top", "cullface": "up", "tintindex": 0},
+        "north": {"uv": [0, 0, 16, 16], "texture": "#side", "cullface": "north", "tintindex": 1},
+        "south": {"uv": [0, 0, 16, 16], "texture": "#side", "cullface": "south", "tintindex": 1},
+        "west": {"uv": [0, 0, 16, 16], "texture": "#side", "cullface": "west", "tintindex": 1},
+        "east": {"uv": [0, 0, 16, 16], "texture": "#side", "cullface": "east", "tintindex": 1},
+    }}
+    grass_overlay = {"from": [0, 0, 0], "to": [16, 16, 16],
+                     "faces": cube_faces("#overlay", tint=0,
+                                         faces=("north", "south", "west", "east"))}
+    # Everywhere the soil texture shows: the four sides and the bottom, but not the top,
+    # which is grass rather than soil.
+    grass_pebbles = {"from": [0, 0, 0], "to": [16, 16, 16],
+                     "faces": cube_faces("#pebbles",
+                                         faces=("down", "north", "south", "west", "east"))}
+    grass_textures["pebbles"] = NS + ":block/tinted_dirt_pebbles"
+
     write_json(os.path.join(models, "block", "tinted_grass_block.json"), {
         "parent": "minecraft:block/block",
-        "textures": {
-            "particle": soil_texture,
-            "bottom": soil_texture,
-            "side": soil_texture,
-            "top": "minecraft:block/grass_block_top",
-            "overlay": "minecraft:block/grass_block_side_overlay",
-        },
-        "elements": [
-            {"from": [0, 0, 0], "to": [16, 16, 16], "faces": {
-                "down": {"uv": [0, 0, 16, 16], "texture": "#bottom", "cullface": "down", "tintindex": 1},
-                "up": {"uv": [0, 0, 16, 16], "texture": "#top", "cullface": "up", "tintindex": 0},
-                "north": {"uv": [0, 0, 16, 16], "texture": "#side", "cullface": "north", "tintindex": 1},
-                "south": {"uv": [0, 0, 16, 16], "texture": "#side", "cullface": "south", "tintindex": 1},
-                "west": {"uv": [0, 0, 16, 16], "texture": "#side", "cullface": "west", "tintindex": 1},
-                "east": {"uv": [0, 0, 16, 16], "texture": "#side", "cullface": "east", "tintindex": 1},
-            }},
-            {"from": [0, 0, 0], "to": [16, 16, 16],
-             "faces": cube_faces("#overlay", tint=0, faces=("north", "south", "west", "east"))},
-        ],
+        "render_type": RENDER_TYPE,
+        "textures": grass_textures,
+        "elements": [soil_cube, grass_pebbles],
+    })
+
+    write_json(os.path.join(models, "block", "tinted_grass_block_overlay.json"), {
+        "parent": "minecraft:block/block",
+        "render_type": RENDER_TYPE,
+        "textures": {"particle": soil_texture,
+                     "overlay": "minecraft:block/grass_block_side_overlay"},
+        "elements": [grass_overlay],
+    })
+
+    # Blockstate multipart is a world-render mechanism; a held or dropped item renders one
+    # model. So the inventory icon needs the two halves recombined into a single model.
+    write_json(os.path.join(models, "block", "tinted_grass_block_inventory.json"), {
+        "parent": "minecraft:block/block",
+        "render_type": RENDER_TYPE,
+        "textures": grass_textures,
+        "elements": [soil_cube, grass_pebbles, grass_overlay],
     })
 
     write_json(os.path.join(models, "block", "tinted_grass_block_snow.json"), {
         "parent": "minecraft:block/block",
+        "render_type": RENDER_TYPE,
         "textures": {
             "particle": soil_texture,
             "bottom": soil_texture,
@@ -449,9 +464,9 @@ def write_models():
 
     # Pre-1.21.4 inventory model. Newer versions read assets/<ns>/items/ instead but still
     # resolve this path, so both can ship side by side.
-    for name in ("tinted_soil", "tinted_coarse_soil", "tinted_grass_block"):
+    for name in ("tinted_dirt", "tinted_coarse_dirt", "tinted_grass_block"):
         write_json(os.path.join(models, "item", name + ".json"),
-                   {"parent": NS + ":block/" + name})
+                   {"parent": NS + ":block/" + INVENTORY_MODEL.get(name, name)})
 
 
 def write_blockstates(rotations=4):
@@ -463,17 +478,31 @@ def write_blockstates(rotations=4):
 
     # Every soil type shares its model -- they differ by tint, not geometry -- but each
     # needs its own blockstate variant so the property is representable.
-    for name in ("tinted_soil", "tinted_coarse_soil"):
+    for name in ("tinted_dirt", "tinted_coarse_dirt"):
         write_json(os.path.join(states, name + ".json"), {"variants": {
             "soil_type=" + soil_type: rotated(NS + ":block/" + name)
             for soil_type in SOIL_TYPE_VALUES
         }})
 
-    variants = {}
-    for soil_type in SOIL_TYPE_VALUES:
-        variants["snowy=false,soil_type=" + soil_type] = rotated(NS + ":block/tinted_grass_block")
-        variants["snowy=true,soil_type=" + soil_type] = {"model": NS + ":block/tinted_grass_block_snow"}
-    write_json(os.path.join(states, "tinted_grass_block.json"), {"variants": variants})
+    # Multipart rather than variants, because the soil cube and the grass overlay are now
+    # separate models that both have to render. Parts apply in order, so the overlay's
+    # quads are emitted after the soil cube's and win the depth tie at the shared surface.
+    #
+    # `soil_type` is deliberately absent from every condition: it selects a tint, not a
+    # model. Multipart also has no exhaustiveness requirement, so unlike the variants map
+    # this no longer has to enumerate the property at all.
+    #
+    # Only the soil cube is randomly rotated, as before. The overlay is a fringe that reads
+    # the same at any rotation, and leaving it fixed keeps it from being rotated
+    # independently of the cube beneath it.
+    write_json(os.path.join(states, "tinted_grass_block.json"), {"multipart": [
+        {"when": {"snowy": "false"},
+         "apply": rotated(NS + ":block/tinted_grass_block")},
+        {"when": {"snowy": "false"},
+         "apply": {"model": NS + ":block/tinted_grass_block_overlay"}},
+        {"when": {"snowy": "true"},
+         "apply": {"model": NS + ":block/tinted_grass_block_snow"}},
+    ]})
 
 
 def argb(rgb):
@@ -486,7 +515,7 @@ def write_item_definitions(soil_tint):
     """1.21.4+ item model definitions, which replaced code-registered ItemColor providers."""
     items = os.path.join(RESOURCES, "assets", NS, "items")
 
-    for name in ("tinted_soil", "tinted_coarse_soil"):
+    for name in ("tinted_dirt", "tinted_coarse_dirt"):
         write_json(os.path.join(items, name + ".json"), {"model": {
             "type": "minecraft:model",
             "model": NS + ":block/" + name,
@@ -499,7 +528,7 @@ def write_item_definitions(soil_tint):
 
     write_json(os.path.join(items, "tinted_grass_block.json"), {"model": {
         "type": "minecraft:model",
-        "model": NS + ":block/tinted_grass_block",
+        "model": NS + ":block/" + INVENTORY_MODEL["tinted_grass_block"],
         "tints": [
             {"type": "minecraft:grass", "temperature": 0.5, "downfall": 1.0},
             {"type": "minecraft:constant", "value": argb(soil_tint)},
@@ -507,22 +536,38 @@ def write_item_definitions(soil_tint):
     }})
 
 
+def write_atlas():
+    """
+    Adds the runtime sprite source to the block atlas.
+
+    <p>The file goes under `assets/minecraft/`, not the mod's own namespace: the atlas
+    definition's id is built from the *atlas* id (`minecraft:blocks`), and the game reads it
+    with `getResourceStack`, which collects that one id from every loaded pack and
+    concatenates their sources. So this appends to vanilla's list rather than replacing it,
+    and a copy under `assets/tintedsoil/` is simply never looked at.
+    """
+    write_json(os.path.join(RESOURCES, "assets", "minecraft", "atlases", "blocks.json"),
+               {"sources": [{"type": NS + ":derived_soil"}]})
+
+
 def write_lang():
     write_json(os.path.join(RESOURCES, "assets", NS, "lang", "en_us.json"), {
         "block." + NS + ".tinted_grass_block": "Tinted Grass Block",
-        "block." + NS + ".tinted_soil": "Tinted Soil",
-        "block." + NS + ".tinted_coarse_soil": "Tinted Coarse Soil",
+        "block." + NS + ".tinted_dirt": "Tinted Dirt",
+        "block." + NS + ".tinted_coarse_dirt": "Tinted Coarse Dirt",
     })
 
 
 def main():
-    texture = generate_texture()
-    luminance = texture_mean_luminance(texture)
-    write_png(TEXTURE_PATH, len(texture[0]), len(texture), texture)
-
-    # Chunkier, higher-contrast grain, normalised to the same mean so it shares the colormap.
-    coarse = generate_texture(seed=0x43524150, clump=4, levels=4, spread=0.34)
-    write_png(COARSE_TEXTURE_PATH, len(coarse[0]), len(coarse), coarse)
+    # The soil textures are not written here any more. SoilSpriteSource derives them at
+    # atlas-stitch time from whatever dirt.png the player's resource packs provide, so the
+    # mod follows a pack instead of shipping a frozen copy of one version's art -- and
+    # nothing derived from Mojang's textures ends up in the jar.
+    #
+    # This is the luminance that derivation measures from vanilla's own dirt.png, verified
+    # against the running client. The dormant climate colormap below is pre-divided by it,
+    # which is exact for vanilla and approximate under a pack that changes dirt's contrast.
+    luminance = VANILLA_MEAN_LUMINANCE
 
     colormap = generate_colormap(luminance)
     write_png(COLORMAP_PATH, len(colormap[0]), len(colormap), colormap)
@@ -537,14 +582,30 @@ def main():
     write_models()
     write_blockstates()
     write_item_definitions(soil_tint)
+    write_atlas()
     write_lang()
 
-    print("texture   %s (mean luminance %.4f)" % (os.path.relpath(TEXTURE_PATH, ROOT), luminance))
-    print("texture   %s (mean luminance %.4f)"
-          % (os.path.relpath(COARSE_TEXTURE_PATH, ROOT), texture_mean_luminance(coarse)))
+    print("textures  derived at runtime by SoilSpriteSource (mean luminance %.4f on vanilla)"
+          % luminance)
     print("colormap  %s" % os.path.relpath(COLORMAP_PATH, ROOT))
-    print("json      tags, loot tables, models, blockstates, item definitions, lang")
+    print("json      tags, loot tables, models, blockstates, item definitions, atlas, lang")
     print("inventory soil tint #%06X" % soil_tint)
+    # SoilColormap.java mirrors this for its degraded fallback path; printing it keeps the
+    # two in sync by hand rather than by memory.
+    print("dry anchor      (%.2f, %.2f, %.2f) -> SoilColormap.TEMPERATE {%d, %d, %d}"
+          % (TEMPERATE_DRY + tuple(int(round(v)) for v in TEMPERATE_DRY)))
+
+    # A tint is stored as `rendered / luminance` in 8 bits, so no rendered colour brighter
+    # than this can be represented. Vanilla's grain is high-contrast, which pushes the
+    # texture mean down and the ceiling with it -- the price of matching vanilla exactly.
+    ceiling = luminance * 255.0
+    print("ceiling   rendered channels must stay <= %.1f (SoilColormap.MEAN_LUMINANCE %.4f)"
+          % (ceiling, luminance))
+    for name, colour in (("HUMID", HUMID), ("SAND", SAND), ("COLD", COLD),
+                         ("dry anchor", TEMPERATE_DRY)):
+        if max(colour) > ceiling:
+            print("          !! %s %s exceeds it and is clamped on write"
+                  % (name, tuple(int(round(v)) for v in colour)))
     print()
     print("Sanity check (rendered colour = colormap * texture luminance):")
     for name, t, d in (

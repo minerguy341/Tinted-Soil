@@ -32,7 +32,7 @@
             },
             {
               "type": "minecraft:item",
-              "name": "tintedsoil:tinted_soil",
+              "name": "tintedsoil:tinted_dirt",
               "conditions": [
                 {
                   "condition": "minecraft:survives_explosion"

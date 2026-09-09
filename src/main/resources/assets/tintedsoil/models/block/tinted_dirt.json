@@ -3,10 +3,7 @@
   "render_type": "minecraft:cutout_mipped",
   "textures": {
     "particle": "tintedsoil:block/tinted_dirt",
-    "bottom": "tintedsoil:block/tinted_dirt",
-    "side": "tintedsoil:block/tinted_dirt",
-    "top": "minecraft:block/grass_block_top",
-    "overlay": "minecraft:block/grass_block_side_overlay",
+    "all": "tintedsoil:block/tinted_dirt",
     "pebbles": "tintedsoil:block/tinted_dirt_pebbles"
   },
   "elements": [
@@ -29,7 +26,7 @@
             16,
             16
           ],
-          "texture": "#bottom",
+          "texture": "#all",
           "cullface": "down",
           "tintindex": 1
         },
@@ -40,9 +37,9 @@
             16,
             16
           ],
-          "texture": "#top",
+          "texture": "#all",
           "cullface": "up",
-          "tintindex": 0
+          "tintindex": 1
         },
         "north": {
           "uv": [
@@ -51,7 +48,7 @@
             16,
             16
           ],
-          "texture": "#side",
+          "texture": "#all",
           "cullface": "north",
           "tintindex": 1
         },
@@ -62,7 +59,7 @@
             16,
             16
           ],
-          "texture": "#side",
+          "texture": "#all",
           "cullface": "south",
           "tintindex": 1
         },
@@ -73,7 +70,7 @@
             16,
             16
           ],
-          "texture": "#side",
+          "texture": "#all",
           "cullface": "west",
           "tintindex": 1
         },
@@ -84,7 +81,7 @@
             16,
             16
           ],
-          "texture": "#side",
+          "texture": "#all",
           "cullface": "east",
           "tintindex": 1
         }
@@ -111,6 +108,16 @@
           ],
           "texture": "#pebbles",
           "cullface": "down"
+        },
+        "up": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#pebbles",
+          "cullface": "up"
         },
         "north": {
           "uv": [

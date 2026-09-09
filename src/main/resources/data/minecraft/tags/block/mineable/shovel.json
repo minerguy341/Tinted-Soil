@@ -2,7 +2,7 @@
   "replace": false,
   "values": [
     "tintedsoil:tinted_grass_block",
-    "tintedsoil:tinted_soil",
-    "tintedsoil:tinted_coarse_soil"
+    "tintedsoil:tinted_dirt",
+    "tintedsoil:tinted_coarse_dirt"
   ]
 }

@@ -10,27 +10,38 @@ import net.minecraft.world.level.block.state.BlockState;
  *
  * <p>Vanilla can only blend tints that are a function of {@code Biome}, because that is what
  * {@code ClientLevel#getBlockTint} box-blurs. Soil type is a property of the <em>block</em>,
- * so left alone it would produce exactly the hard seam this mod exists to remove — a wall of
- * peat meeting a wall of sandy soil with a one-pixel edge between them. This does the
- * equivalent blur in block space: sample the types around a position, mix their colours by
- * how many of each there are, and pull the biome colour toward the result.
+ * so left alone it produces exactly the hard seam this mod exists to remove. That seam is
+ * not only a biome-border phenomenon: where a worldgen mod mixes its own dirt into vanilla
+ * dirt, the two interleave block by block through the same cliff face, and every boundary
+ * between them is one pixel wide.
  *
- * <p>Cost is {@code (2r+1)^2} block reads per tinted face, which is the same order as
- * vanilla's biome blur but uncached — see the note on {@link #RADIUS}. Blocks that are not
- * ours abstain rather than voting for plain dirt, so a soil patch meeting stone keeps its
- * character instead of being washed out.
+ * <p>So this box-blurs in block space: sample the soil types around a position and average
+ * their colours. Every type votes, plain dirt included, which makes the result a genuine
+ * interpolation between two dirts rather than a nudge away from a shared base. Blocks that
+ * are not ours abstain rather than voting for plain dirt, so a soil patch meeting stone or
+ * air keeps its character instead of being washed out towards the middle.
  */
 public final class SoilTypeBlend {
     /**
      * Horizontal blur radius, in blocks. 2 matches Minecraft's default biome blend radius.
-     *
-     * <p>Only the same Y level is sampled. Soil strata are a few blocks deep before hitting
-     * stone, so a vertical blur would mostly average in blocks that are not soil at all,
-     * and it would triple the cost. Unlike vanilla's biome blur this result is not cached;
-     * if profiling shows it matters, a per-position cache keyed like {@code BlockTintCache}
-     * is the obvious next step.
      */
     public static final int RADIUS = 2;
+
+    /**
+     * Vertical blur radius, in blocks.
+     *
+     * <p>Sampling only the same Y is enough for flat ground, where soil is a shallow skin
+     * over stone, but it leaves a cliff face banded: each row blends along itself and not
+     * with the rows above and below, so a vertical mix of two dirts stays as sharp as it
+     * started. Exposed soil is mostly what players look at, so it gets a vertical vote too.
+     *
+     * <p>Held below {@link #RADIUS} deliberately. Cost is {@code (2r+1)^2 * (2v+1)} block
+     * reads per tinted face and this result, unlike vanilla's biome blur, is not cached, so
+     * matching the horizontal radius here would be five times the current cost rather than
+     * three. If profiling says it matters, a per-position cache keyed like
+     * {@code BlockTintCache} is the obvious next step.
+     */
+    public static final int VERTICAL_RADIUS = 1;
 
     private static final SoilType[] TYPES = SoilType.values();
 
@@ -38,69 +49,51 @@ public final class SoilTypeBlend {
     }
 
     /**
-     * @param base the biome-blended soil tint
-     * @return {@code base} pulled toward the surrounding soil types' colours
+     * @param fallback the colour to use when nothing nearby is a soil block at all
+     * @return the average of the surrounding soil types' colours
      */
-    public static int apply(BlockAndTintGetter view, BlockPos pos, int base) {
-        float[] weights = new float[TYPES.length];
+    public static int apply(BlockAndTintGetter view, BlockPos pos, int fallback) {
+        int[] counts = new int[TYPES.length];
         int samples = 0;
 
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-        int y = pos.getY();
-        for (int dx = -RADIUS; dx <= RADIUS; dx++) {
-            for (int dz = -RADIUS; dz <= RADIUS; dz++) {
-                cursor.set(pos.getX() + dx, y, pos.getZ() + dz);
-                BlockState state = view.getBlockState(cursor);
-                if (!state.hasProperty(SoilType.PROPERTY)) {
-                    continue; // Not one of ours: abstains rather than voting for plain dirt.
+        for (int dy = -VERTICAL_RADIUS; dy <= VERTICAL_RADIUS; dy++) {
+            for (int dx = -RADIUS; dx <= RADIUS; dx++) {
+                for (int dz = -RADIUS; dz <= RADIUS; dz++) {
+                    cursor.set(pos.getX() + dx, pos.getY() + dy, pos.getZ() + dz);
+                    BlockState state = view.getBlockState(cursor);
+                    if (!state.hasProperty(SoilType.PROPERTY)) {
+                        continue; // Not one of ours: abstains rather than voting for plain dirt.
+                    }
+                    counts[state.getValue(SoilType.PROPERTY).ordinal()]++;
+                    samples++;
                 }
-                weights[state.getValue(SoilType.PROPERTY).ordinal()]++;
-                samples++;
             }
         }
 
         if (samples == 0) {
-            return base;
+            return fallback;
         }
 
-        float typed = 0.0F;
-        float red = 0.0F;
-        float green = 0.0F;
-        float blue = 0.0F;
+        int red = 0;
+        int green = 0;
+        int blue = 0;
         for (int i = 0; i < TYPES.length; i++) {
-            float weight = weights[i];
-            if (weight == 0.0F) {
+            int count = counts[i];
+            if (count == 0) {
                 continue;
             }
             int tint = SoilTypePalette.tint(TYPES[i]);
-            if (tint < 0) {
-                continue; // DEFAULT: leaves the biome colour alone.
-            }
-            red += weight * ((tint >> 16) & 0xFF);
-            green += weight * ((tint >> 8) & 0xFF);
-            blue += weight * (tint & 0xFF);
-            typed += weight;
+            red += count * ((tint >> 16) & 0xFF);
+            green += count * ((tint >> 8) & 0xFF);
+            blue += count * (tint & 0xFF);
         }
 
-        if (typed == 0.0F) {
-            return base; // Ordinary dirt all round: the biome colour, untouched.
-        }
-
-        // Scaled by how much of the neighbourhood is typed, so the pull fades out gradually
-        // toward plain terrain instead of stopping at the last typed block.
-        float strength = SoilTypePalette.STRENGTH * (typed / samples);
-        return lerp(base, red / typed, green / typed, blue / typed, strength);
+        return (channel(red, samples) << 16) | (channel(green, samples) << 8) | channel(blue, samples);
     }
 
-    private static int lerp(int base, float red, float green, float blue, float amount) {
-        int r = channel((base >> 16) & 0xFF, red, amount);
-        int g = channel((base >> 8) & 0xFF, green, amount);
-        int b = channel(base & 0xFF, blue, amount);
-        return (r << 16) | (g << 8) | b;
-    }
-
-    private static int channel(int from, float to, float amount) {
-        int value = Math.round(from + (to - from) * amount);
+    private static int channel(int total, int samples) {
+        int value = (total + samples / 2) / samples;
         return Math.min(255, Math.max(0, value));
     }
 }

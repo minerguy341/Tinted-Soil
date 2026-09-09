@@ -1,8 +1,9 @@
 {
   "parent": "minecraft:block/block",
+  "render_type": "minecraft:cutout_mipped",
   "textures": {
-    "particle": "tintedsoil:block/tinted_soil",
-    "all": "tintedsoil:block/tinted_soil"
+    "particle": "tintedsoil:block/tinted_dirt",
+    "overlay": "minecraft:block/grass_block_side_overlay"
   },
   "elements": [
     {
@@ -17,28 +18,6 @@
         16
       ],
       "faces": {
-        "down": {
-          "uv": [
-            0,
-            0,
-            16,
-            16
-          ],
-          "texture": "#all",
-          "cullface": "down",
-          "tintindex": 1
-        },
-        "up": {
-          "uv": [
-            0,
-            0,
-            16,
-            16
-          ],
-          "texture": "#all",
-          "cullface": "up",
-          "tintindex": 1
-        },
         "north": {
           "uv": [
             0,
@@ -46,9 +25,9 @@
             16,
             16
           ],
-          "texture": "#all",
+          "texture": "#overlay",
           "cullface": "north",
-          "tintindex": 1
+          "tintindex": 0
         },
         "south": {
           "uv": [
@@ -57,9 +36,9 @@
             16,
             16
           ],
-          "texture": "#all",
+          "texture": "#overlay",
           "cullface": "south",
-          "tintindex": 1
+          "tintindex": 0
         },
         "west": {
           "uv": [
@@ -68,9 +47,9 @@
             16,
             16
           ],
-          "texture": "#all",
+          "texture": "#overlay",
           "cullface": "west",
-          "tintindex": 1
+          "tintindex": 0
         },
         "east": {
           "uv": [
@@ -79,9 +58,9 @@
             16,
             16
           ],
-          "texture": "#all",
+          "texture": "#overlay",
           "cullface": "east",
-          "tintindex": 1
+          "tintindex": 0
         }
       }
     }

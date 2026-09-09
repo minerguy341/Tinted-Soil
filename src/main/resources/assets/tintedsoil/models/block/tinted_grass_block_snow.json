@@ -1,8 +1,9 @@
 {
   "parent": "minecraft:block/block",
+  "render_type": "minecraft:cutout_mipped",
   "textures": {
-    "particle": "tintedsoil:block/tinted_soil",
-    "bottom": "tintedsoil:block/tinted_soil",
+    "particle": "tintedsoil:block/tinted_dirt",
+    "bottom": "tintedsoil:block/tinted_dirt",
     "side": "minecraft:block/grass_block_snow",
     "top": "minecraft:block/grass_block_top"
   },

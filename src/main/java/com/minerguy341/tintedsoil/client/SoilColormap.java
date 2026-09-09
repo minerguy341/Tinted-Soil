@@ -24,12 +24,13 @@ import java.io.InputStream;
 public final class SoilColormap {
     private static final int SIZE = 256;
 
-    // Anchors mirrored from tools/generate_assets.py -- keep the two in sync.
-    private static final int[] TEMPERATE = {134, 96, 67};
+    // Anchors mirrored from tools/generate_assets.py -- keep the two in sync; the generator
+    // prints TEMPERATE_DRY on every run for exactly that reason. It is derived rather than
+    // chosen: it is the dry-temperate anchor that lands plains on vanilla dirt (#866043).
+    private static final int[] TEMPERATE = {132, 81, 51};
     private static final int[] HUMID = {104, 72, 46};
     private static final int[] SAND = {206, 183, 138};
     private static final int[] COLD = {146, 138, 128};
-    private static final double MEAN_LUMINANCE = 0.860;
     private static final double SAND_TEMP_EXP = 1.5;
     private static final double SAND_DRY_EXP = 3.0;
     private static final double COLD_EXP = 2.0;
@@ -44,8 +45,17 @@ public final class SoilColormap {
         pixels = null;
     }
 
+    /**
+     * The soil colour with no world context: inventory icons, and the fallback when a block
+     * is asked for its tint outside a level.
+     *
+     * <p>Reads the palette rather than the colormap. The colormap is pre-divided by a
+     * build-time luminance, but the texture is now derived at runtime from the player's own
+     * dirt.png, so only a value that goes through {@link #toTint} at read time is consistent
+     * with what is actually on the atlas.
+     */
     public static int defaultColor() {
-        return get(0.8, 0.4); // plains
+        return SoilTypePalette.tint(com.minerguy341.tintedsoil.block.SoilType.DEFAULT);
     }
 
     public static int get(double temperature, double downfall) {
@@ -126,7 +136,11 @@ public final class SoilColormap {
     }
 
     private static int channel(double rendered) {
-        return Math.min(255, Math.max(0, (int) Math.round(rendered / MEAN_LUMINANCE)));
+        // Measured from the soil texture actually on the atlas, which SoilSpriteSource
+        // derives from whatever dirt.png the player's resource packs supply. A darker dirt
+        // needs a brighter tint to land on the same rendered colour, so this cannot be the
+        // compile-time constant it used to be.
+        return Math.min(255, Math.max(0, (int) Math.round(rendered / SoilTextures.meanLuminance())));
     }
 
     private static double clamp(double value) {

@@ -9,6 +9,8 @@ public class TintedSoilFabricClient implements ClientModInitializer {
     public void onInitializeClient() {
         TintedSoilColors.registerBlockColors(ColorProviderRegistry.BLOCK::register);
         LegacyItemColors.registerFabric();
+        SoilRenderLayer.registerFabric();
+        SoilSpriteSources.register();
     }
 }
 //?}

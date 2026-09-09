@@ -29,6 +29,14 @@ dependencies {
         "fabric-rendering-v1",
         "fabric-item-group-api-v1",
     )
+
+    // BlockRenderLayerMap's own module before 1.21.6, folded into fabric-rendering-v1 after.
+    if (sc.current.parsed < "1.21.6") fapi("fabric-blockrenderlayer-v1")
+
+    // `fabric.mod.json` hard-depends on `fabric-api`, an id none of the individual modules
+    // above provide, so the dev client needs the umbrella bundle. Runtime-only and dev-only:
+    // it stays out of the published jar's metadata.
+    modLocalRuntime("net.fabricmc.fabric-api:fabric-api:${sc.properties.get<String>("deps.fabric_api")}")
 }
 
 loom {

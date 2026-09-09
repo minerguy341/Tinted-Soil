@@ -1,0 +1,106 @@
+{
+  "variants": {
+    "soil_type=default": [
+      {
+        "model": "tintedsoil:block/tinted_dirt"
+      },
+      {
+        "model": "tintedsoil:block/tinted_dirt",
+        "y": 90
+      },
+      {
+        "model": "tintedsoil:block/tinted_dirt",
+        "y": 180
+      },
+      {
+        "model": "tintedsoil:block/tinted_dirt",
+        "y": 270
+      }
+    ],
+    "soil_type=podzol": [
+      {
+        "model": "tintedsoil:block/tinted_dirt"
+      },
+      {
+        "model": "tintedsoil:block/tinted_dirt",
+        "y": 90
+      },
+      {
+        "model": "tintedsoil:block/tinted_dirt",
+        "y": 180
+      },
+      {
+        "model": "tintedsoil:block/tinted_dirt",
+        "y": 270
+      }
+    ],
+    "soil_type=lush": [
+      {
+        "model": "tintedsoil:block/tinted_dirt"
+      },
+      {
+        "model": "tintedsoil:block/tinted_dirt",
+        "y": 90
+      },
+      {
+        "model": "tintedsoil:block/tinted_dirt",
+        "y": 180
+      },
+      {
+        "model": "tintedsoil:block/tinted_dirt",
+        "y": 270
+      }
+    ],
+    "soil_type=sandy": [
+      {
+        "model": "tintedsoil:block/tinted_dirt"
+      },
+      {
+        "model": "tintedsoil:block/tinted_dirt",
+        "y": 90
+      },
+      {
+        "model": "tintedsoil:block/tinted_dirt",
+        "y": 180
+      },
+      {
+        "model": "tintedsoil:block/tinted_dirt",
+        "y": 270
+      }
+    ],
+    "soil_type=peat": [
+      {
+        "model": "tintedsoil:block/tinted_dirt"
+      },
+      {
+        "model": "tintedsoil:block/tinted_dirt",
+        "y": 90
+      },
+      {
+        "model": "tintedsoil:block/tinted_dirt",
+        "y": 180
+      },
+      {
+        "model": "tintedsoil:block/tinted_dirt",
+        "y": 270
+      }
+    ],
+    "soil_type=origin": [
+      {
+        "model": "tintedsoil:block/tinted_dirt"
+      },
+      {
+        "model": "tintedsoil:block/tinted_dirt",
+        "y": 90
+      },
+      {
+        "model": "tintedsoil:block/tinted_dirt",
+        "y": 180
+      },
+      {
+        "model": "tintedsoil:block/tinted_dirt",
+        "y": 270
+      }
+    ]
+  }
+}

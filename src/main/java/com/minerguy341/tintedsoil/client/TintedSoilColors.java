@@ -100,13 +100,23 @@ public final class TintedSoilColors {
     private TintedSoilColors() {
     }
 
+    /**
+     * Soil colour comes from the surrounding soil types alone.
+     *
+     * <p>Climate no longer varies it, so every vanilla biome renders the same standard
+     * dirt and only a worldgen mod's own soil blocks shift the colour -- blurred across
+     * block boundaries by {@link SoilTypeBlend} so a mixed cliff face reads as a gradient.
+     *
+     * <p>{@link #SOIL_COLOR_RESOLVER} is therefore unused for now. It is left in place
+     * rather than deleted because it is the whole biome-driven path, and reinstating it is
+     * a matter of passing {@code view.getBlockTint(pos, SOIL_COLOR_RESOLVER)} here again in
+     * place of the constant.
+     */
     private static int soilTint(BlockAndTintGetter view, BlockPos pos) {
         if (view == null || pos == null) {
             return SoilColormap.defaultColor();
         }
-        // Two blends compose here: vanilla blurs the resolver across biomes, and
-        // SoilTypeBlend blurs soil types across blocks.
-        return SoilTypeBlend.apply(view, pos, view.getBlockTint(pos, SOIL_COLOR_RESOLVER));
+        return SoilTypeBlend.apply(view, pos, SoilColormap.defaultColor());
     }
 
     /**
@@ -115,14 +125,14 @@ public final class TintedSoilColors {
      */
     public static void registerBlockColors(BlockColorRegistrar blocks) {
         blocks.register(GRASS_BLOCK_COLOR, TintedSoilBlocks.TINTED_GRASS_BLOCK);
-        blocks.register(SOIL_BLOCK_COLOR, TintedSoilBlocks.TINTED_SOIL, TintedSoilBlocks.TINTED_COARSE_SOIL);
+        blocks.register(SOIL_BLOCK_COLOR, TintedSoilBlocks.TINTED_DIRT, TintedSoilBlocks.TINTED_COARSE_DIRT);
     }
 
     //? if <1.21.2 {
     public static void registerItemColors(ItemColorRegistrar items) {
         items.register(GRASS_ITEM_COLOR, TintedSoilBlocks.TINTED_GRASS_BLOCK_ITEM);
-        items.register(SOIL_ITEM_COLOR, TintedSoilBlocks.TINTED_SOIL_ITEM,
-                TintedSoilBlocks.TINTED_COARSE_SOIL_ITEM);
+        items.register(SOIL_ITEM_COLOR, TintedSoilBlocks.TINTED_DIRT_ITEM,
+                TintedSoilBlocks.TINTED_COARSE_DIRT_ITEM);
     }
 
     @FunctionalInterface

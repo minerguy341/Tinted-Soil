@@ -1,6 +1,6 @@
 {
   "type": "minecraft:block",
-  "random_sequence": "tintedsoil:blocks/tinted_soil",
+  "random_sequence": "tintedsoil:blocks/tinted_coarse_dirt",
   "pools": [
     {
       "rolls": 1.0,
@@ -8,7 +8,7 @@
       "entries": [
         {
           "type": "minecraft:item",
-          "name": "tintedsoil:tinted_soil"
+          "name": "tintedsoil:tinted_coarse_dirt"
         }
       ],
       "conditions": [

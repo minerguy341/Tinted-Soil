@@ -1,7 +1,7 @@
 {
   "model": {
     "type": "minecraft:model",
-    "model": "tintedsoil:block/tinted_grass_block",
+    "model": "tintedsoil:block/tinted_grass_block_inventory",
     "tints": [
       {
         "type": "minecraft:grass",
@@ -10,7 +10,7 @@
       },
       {
         "type": "minecraft:constant",
-        "value": -6391723
+        "value": -4553638
       }
     ]
   }

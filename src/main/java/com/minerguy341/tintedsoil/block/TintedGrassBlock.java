@@ -58,7 +58,7 @@ public class TintedGrassBlock extends GrassBlock {
         if (!SpreadingSnowyDirtBlockInvoker.tintedsoil$canBeGrass(state, level, pos)) {
             // Too dark or drowned: die back to bare soil, mirroring vanilla. The soil type
             // rides along so a patch does not forget it was peat just because it lost grass.
-            level.setBlockAndUpdate(pos, TintedSoilBlocks.TINTED_SOIL.defaultBlockState()
+            level.setBlockAndUpdate(pos, TintedSoilBlocks.TINTED_DIRT.defaultBlockState()
                     .setValue(SoilType.PROPERTY, state.getValue(SoilType.PROPERTY)));
             return;
         }
@@ -71,7 +71,7 @@ public class TintedGrassBlock extends GrassBlock {
         for (int attempt = 0; attempt < 4; attempt++) {
             BlockPos target = pos.offset(random.nextInt(3) - 1, random.nextInt(5) - 3, random.nextInt(3) - 1);
             BlockState targetState = level.getBlockState(target);
-            if (!targetState.is(TintedSoilBlocks.TINTED_SOIL)) {
+            if (!targetState.is(TintedSoilBlocks.TINTED_DIRT)) {
                 continue;
             }
             if (!SpreadingSnowyDirtBlockInvoker.tintedsoil$canPropagate(spreading, level, target)) {

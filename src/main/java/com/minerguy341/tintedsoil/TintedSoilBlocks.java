@@ -20,7 +20,7 @@ import java.util.function.BiConsumer;
  * hardness, sound, tool requirements and every {@code BlockBehaviour} flag other mods
  * rely on carry over unchanged.
  *
- * <p>Coarse soil is a distinct block rather than a blockstate of {@link #TINTED_SOIL}
+ * <p>Coarse soil is a distinct block rather than a blockstate of {@link #TINTED_DIRT}
  * because vanilla models it that way too, and because the difference has to be visible to
  * grass spreading, hoes, loot and tags. Folding it into one block would have made every
  * one of those a per-state special case. It costs nothing conceptually: the mod is still
@@ -28,46 +28,46 @@ import java.util.function.BiConsumer;
  */
 public final class TintedSoilBlocks {
     public static final ResourceLocation TINTED_GRASS_BLOCK_ID = TintedSoil.id("tinted_grass_block");
-    public static final ResourceLocation TINTED_SOIL_ID = TintedSoil.id("tinted_soil");
-    public static final ResourceLocation TINTED_COARSE_SOIL_ID = TintedSoil.id("tinted_coarse_soil");
+    public static final ResourceLocation TINTED_DIRT_ID = TintedSoil.id("tinted_dirt");
+    public static final ResourceLocation TINTED_COARSE_DIRT_ID = TintedSoil.id("tinted_coarse_dirt");
 
     public static final ResourceKey<Block> TINTED_GRASS_BLOCK_KEY =
             ResourceKey.create(Registries.BLOCK, TINTED_GRASS_BLOCK_ID);
-    public static final ResourceKey<Block> TINTED_SOIL_KEY =
-            ResourceKey.create(Registries.BLOCK, TINTED_SOIL_ID);
-    public static final ResourceKey<Block> TINTED_COARSE_SOIL_KEY =
-            ResourceKey.create(Registries.BLOCK, TINTED_COARSE_SOIL_ID);
+    public static final ResourceKey<Block> TINTED_DIRT_KEY =
+            ResourceKey.create(Registries.BLOCK, TINTED_DIRT_ID);
+    public static final ResourceKey<Block> TINTED_COARSE_DIRT_KEY =
+            ResourceKey.create(Registries.BLOCK, TINTED_COARSE_DIRT_ID);
 
     public static final ResourceKey<Item> TINTED_GRASS_BLOCK_ITEM_KEY =
             ResourceKey.create(Registries.ITEM, TINTED_GRASS_BLOCK_ID);
-    public static final ResourceKey<Item> TINTED_SOIL_ITEM_KEY =
-            ResourceKey.create(Registries.ITEM, TINTED_SOIL_ID);
-    public static final ResourceKey<Item> TINTED_COARSE_SOIL_ITEM_KEY =
-            ResourceKey.create(Registries.ITEM, TINTED_COARSE_SOIL_ID);
+    public static final ResourceKey<Item> TINTED_DIRT_ITEM_KEY =
+            ResourceKey.create(Registries.ITEM, TINTED_DIRT_ID);
+    public static final ResourceKey<Item> TINTED_COARSE_DIRT_ITEM_KEY =
+            ResourceKey.create(Registries.ITEM, TINTED_COARSE_DIRT_ID);
 
     /** Grass-topped surface block: tint index 0 is grass, tint index 1 is the soil underneath. */
     public static final TintedGrassBlock TINTED_GRASS_BLOCK =
             new TintedGrassBlock(copyOf(Blocks.GRASS_BLOCK, TINTED_GRASS_BLOCK_KEY));
 
     /** Bare soil block: a single soil tint, no grass. */
-    public static final TintedSoilBlock TINTED_SOIL =
-            new TintedSoilBlock(copyOf(Blocks.DIRT, TINTED_SOIL_KEY));
+    public static final TintedSoilBlock TINTED_DIRT =
+            new TintedSoilBlock(copyOf(Blocks.DIRT, TINTED_DIRT_KEY));
 
     /**
      * Bare soil that grass will not spread onto, standing in for coarse dirt.
      *
      * <p>Grass spreading in {@link com.minerguy341.tintedsoil.block.TintedGrassBlock} only
-     * walks {@link #TINTED_SOIL}, so being a separate block is what keeps this one bare.
+     * walks {@link #TINTED_DIRT}, so being a separate block is what keeps this one bare.
      */
-    public static final TintedSoilBlock TINTED_COARSE_SOIL =
-            new TintedSoilBlock(copyOf(Blocks.COARSE_DIRT, TINTED_COARSE_SOIL_KEY));
+    public static final TintedSoilBlock TINTED_COARSE_DIRT =
+            new TintedSoilBlock(copyOf(Blocks.COARSE_DIRT, TINTED_COARSE_DIRT_KEY));
 
     public static final Item TINTED_GRASS_BLOCK_ITEM =
             new BlockItem(TINTED_GRASS_BLOCK, itemProperties(TINTED_GRASS_BLOCK_ITEM_KEY));
-    public static final Item TINTED_SOIL_ITEM =
-            new BlockItem(TINTED_SOIL, itemProperties(TINTED_SOIL_ITEM_KEY));
-    public static final Item TINTED_COARSE_SOIL_ITEM =
-            new BlockItem(TINTED_COARSE_SOIL, itemProperties(TINTED_COARSE_SOIL_ITEM_KEY));
+    public static final Item TINTED_DIRT_ITEM =
+            new BlockItem(TINTED_DIRT, itemProperties(TINTED_DIRT_ITEM_KEY));
+    public static final Item TINTED_COARSE_DIRT_ITEM =
+            new BlockItem(TINTED_COARSE_DIRT, itemProperties(TINTED_COARSE_DIRT_ITEM_KEY));
 
     private TintedSoilBlocks() {
     }
@@ -102,10 +102,10 @@ public final class TintedSoilBlocks {
     public static void register(BiConsumer<ResourceLocation, Block> blocks,
                                 BiConsumer<ResourceLocation, Item> items) {
         blocks.accept(TINTED_GRASS_BLOCK_ID, TINTED_GRASS_BLOCK);
-        blocks.accept(TINTED_SOIL_ID, TINTED_SOIL);
-        blocks.accept(TINTED_COARSE_SOIL_ID, TINTED_COARSE_SOIL);
+        blocks.accept(TINTED_DIRT_ID, TINTED_DIRT);
+        blocks.accept(TINTED_COARSE_DIRT_ID, TINTED_COARSE_DIRT);
         items.accept(TINTED_GRASS_BLOCK_ID, TINTED_GRASS_BLOCK_ITEM);
-        items.accept(TINTED_SOIL_ID, TINTED_SOIL_ITEM);
-        items.accept(TINTED_COARSE_SOIL_ID, TINTED_COARSE_SOIL_ITEM);
+        items.accept(TINTED_DIRT_ID, TINTED_DIRT_ITEM);
+        items.accept(TINTED_COARSE_DIRT_ID, TINTED_COARSE_DIRT_ITEM);
     }
 }
