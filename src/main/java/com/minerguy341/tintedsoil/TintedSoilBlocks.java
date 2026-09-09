@@ -1,6 +1,7 @@
 package com.minerguy341.tintedsoil;
 
 import com.minerguy341.tintedsoil.block.TintedGrassBlock;
+import com.minerguy341.tintedsoil.block.TintedSoilBlock;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -49,8 +50,8 @@ public final class TintedSoilBlocks {
             new TintedGrassBlock(copyOf(Blocks.GRASS_BLOCK, TINTED_GRASS_BLOCK_KEY));
 
     /** Bare soil block: a single soil tint, no grass. */
-    public static final Block TINTED_SOIL =
-            new Block(copyOf(Blocks.DIRT, TINTED_SOIL_KEY));
+    public static final TintedSoilBlock TINTED_SOIL =
+            new TintedSoilBlock(copyOf(Blocks.DIRT, TINTED_SOIL_KEY));
 
     /**
      * Bare soil that grass will not spread onto, standing in for coarse dirt.
@@ -58,8 +59,8 @@ public final class TintedSoilBlocks {
      * <p>Grass spreading in {@link com.minerguy341.tintedsoil.block.TintedGrassBlock} only
      * walks {@link #TINTED_SOIL}, so being a separate block is what keeps this one bare.
      */
-    public static final Block TINTED_COARSE_SOIL =
-            new Block(copyOf(Blocks.COARSE_DIRT, TINTED_COARSE_SOIL_KEY));
+    public static final TintedSoilBlock TINTED_COARSE_SOIL =
+            new TintedSoilBlock(copyOf(Blocks.COARSE_DIRT, TINTED_COARSE_SOIL_KEY));
 
     public static final Item TINTED_GRASS_BLOCK_ITEM =
             new BlockItem(TINTED_GRASS_BLOCK, itemProperties(TINTED_GRASS_BLOCK_ITEM_KEY));

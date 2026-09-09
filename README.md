@@ -50,11 +50,51 @@ forest        T=0.70 D=0.80  #72533A     taiga           T=0.25 D=0.80  #826F5E
 jungle        T=0.95 D=0.90  #6B4B30     snowy plains    T=0.00 D=0.50  #928A80
 ```
 
-**The blending is the point.** The soil tint goes through a `ColorResolver`, so
-`ClientLevel#getBlockTint` box-blurs it over the player's biome-blend radius, exactly the
+### Two blends, composed
+
+A soil colour has to answer two questions — *where* is this, and *what* is it — and each
+gets its own blend.
+
+**Where: the biome, blended across biomes.** The soil tint goes through a `ColorResolver`,
+so `ClientLevel#getBlockTint` box-blurs it over the player's biome-blend radius, exactly the
 way grass and water are blended. That is what turns a biome border into a gradient. Vanilla
 builds its tint-cache map with a fixed set of resolvers, so `ClientLevelMixin` gives the
 soil resolver a `BlockTintCache` of its own.
+
+A biome that declares its own `grass_color` has that choice **inherited**: the colour is
+matched back to a cell of vanilla's `grass.png` (`GrassColorIndex` inverts it by search) and
+the soil colormap is sampled at the same cell. The two colormaps share an index space, so
+asking "which climate does this grass *look* like?" makes soil follow whatever art direction
+a biome author chose — Biomes O' Plenty's and BWG's included — with no per-biome data here.
+Biomes without an override fall back to their own climate. The override is read directly
+rather than through `getGrassColor(x, z)`, which would apply swamp's and dark forest's
+positional modifiers and make soil flicker across a biome.
+
+**What: the soil type, blended across blocks.** Vanilla can only blend tints that are a
+function of `Biome`. Soil type is a property of the *block*, so left alone it would produce
+exactly the hard seam this mod exists to remove — peat meeting sandy soil with a one-pixel
+edge. `SoilTypeBlend` does the equivalent blur in block space: sample the types in a 5×5
+horizontal kernel, mix their colours by how many of each there are, and pull the biome
+colour toward the result. Blocks that are not ours abstain rather than voting for plain
+dirt, so soil meeting stone keeps its character instead of washing out.
+
+The pull is scaled by `SoilTypePalette.STRENGTH` (0.6) and by how much of the neighbourhood
+is typed, so type is a *character on top of* climate rather than a replacement for it — the
+same lush soil still reads colder in a snowy biome than in a jungle. Plain dirt contributes
+nothing at all, which is what keeps ordinary terrain looking exactly as it did.
+
+A peat/plain boundary across the kernel:
+
+```
+ 0/25 peat  #876749      15/25 peat  #6C533C
+ 5/25 peat  #7E6045      20/25 peat  #634D38
+10/25 peat  #755A40      25/25 peat  #594734
+```
+
+> **Performance note.** The block-space blur is `(2r+1)² = 25` block reads per tinted face
+> and, unlike vanilla's biome blur, is **not cached**. That is the known cost of getting
+> smooth type transitions, and it is unprofiled — if it shows up, a per-position cache keyed
+> like `BlockTintCache` is the obvious next step. `SoilTypeBlend.RADIUS` tunes it.
 
 ### Retuning it
 
@@ -93,6 +133,27 @@ Shipped defaults, taken from the mods' own jars rather than guessed:
 
 Modded entries are marked `"required": false`, so the mods are optional at runtime and no
 compile-time dependency on either is needed.
+
+### Soil types
+
+A replaced block records *which* soil it stood in for, in a `soil_type` blockstate property,
+and keeps it for good — long after worldgen has finished. Grass carries the type across as
+it spreads and dies back, so a patch never forgets it was peat just because it lost its
+grass. Assignment is by tag, so a datapack can route a modded soil to whichever type looks
+closest:
+
+| `soil_type` | Sources | Character |
+|-------------|---------|-----------|
+| `default` | everything unlisted | none — the biome colour, untouched |
+| `podzol` | `minecraft:podzol` | dark orange-brown |
+| `lush` | `biomeswevegone:lush_dirt`, `lush_grass_block` | dark, rich |
+| `sandy` | `biomeswevegone:sandy_dirt` | pale and sandy |
+| `peat` | `biomeswevegone:peat` | near-black bog soil |
+| `origin` | `biomesoplenty:origin_grass_block` | warm mid brown |
+
+This is colour only. Behaviour differences live in the blocks: coarse soil is its own block
+because grass must not spread onto it. Breaking and replacing a block loses its type and
+gives you plain soil, as vanilla does with grass.
 
 Coarse dirt and podzol both map to **soil**, not grass: neither has a grass overlay, so
 sending them to the grass block would paint grass over badlands and old-growth taiga floors.

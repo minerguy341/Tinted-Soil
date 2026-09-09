@@ -1,6 +1,6 @@
 {
   "variants": {
-    "snowy=false": [
+    "snowy=false,soil_type=default": [
       {
         "model": "tintedsoil:block/tinted_grass_block"
       },
@@ -17,7 +17,107 @@
         "y": 270
       }
     ],
-    "snowy=true": {
+    "snowy=true,soil_type=default": {
+      "model": "tintedsoil:block/tinted_grass_block_snow"
+    },
+    "snowy=false,soil_type=podzol": [
+      {
+        "model": "tintedsoil:block/tinted_grass_block"
+      },
+      {
+        "model": "tintedsoil:block/tinted_grass_block",
+        "y": 90
+      },
+      {
+        "model": "tintedsoil:block/tinted_grass_block",
+        "y": 180
+      },
+      {
+        "model": "tintedsoil:block/tinted_grass_block",
+        "y": 270
+      }
+    ],
+    "snowy=true,soil_type=podzol": {
+      "model": "tintedsoil:block/tinted_grass_block_snow"
+    },
+    "snowy=false,soil_type=lush": [
+      {
+        "model": "tintedsoil:block/tinted_grass_block"
+      },
+      {
+        "model": "tintedsoil:block/tinted_grass_block",
+        "y": 90
+      },
+      {
+        "model": "tintedsoil:block/tinted_grass_block",
+        "y": 180
+      },
+      {
+        "model": "tintedsoil:block/tinted_grass_block",
+        "y": 270
+      }
+    ],
+    "snowy=true,soil_type=lush": {
+      "model": "tintedsoil:block/tinted_grass_block_snow"
+    },
+    "snowy=false,soil_type=sandy": [
+      {
+        "model": "tintedsoil:block/tinted_grass_block"
+      },
+      {
+        "model": "tintedsoil:block/tinted_grass_block",
+        "y": 90
+      },
+      {
+        "model": "tintedsoil:block/tinted_grass_block",
+        "y": 180
+      },
+      {
+        "model": "tintedsoil:block/tinted_grass_block",
+        "y": 270
+      }
+    ],
+    "snowy=true,soil_type=sandy": {
+      "model": "tintedsoil:block/tinted_grass_block_snow"
+    },
+    "snowy=false,soil_type=peat": [
+      {
+        "model": "tintedsoil:block/tinted_grass_block"
+      },
+      {
+        "model": "tintedsoil:block/tinted_grass_block",
+        "y": 90
+      },
+      {
+        "model": "tintedsoil:block/tinted_grass_block",
+        "y": 180
+      },
+      {
+        "model": "tintedsoil:block/tinted_grass_block",
+        "y": 270
+      }
+    ],
+    "snowy=true,soil_type=peat": {
+      "model": "tintedsoil:block/tinted_grass_block_snow"
+    },
+    "snowy=false,soil_type=origin": [
+      {
+        "model": "tintedsoil:block/tinted_grass_block"
+      },
+      {
+        "model": "tintedsoil:block/tinted_grass_block",
+        "y": 90
+      },
+      {
+        "model": "tintedsoil:block/tinted_grass_block",
+        "y": 180
+      },
+      {
+        "model": "tintedsoil:block/tinted_grass_block",
+        "y": 270
+      }
+    ],
+    "snowy=true,soil_type=origin": {
       "model": "tintedsoil:block/tinted_grass_block_snow"
     }
   }

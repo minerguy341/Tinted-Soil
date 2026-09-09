@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    {
+      "id": "biomesoplenty:origin_grass_block",
+      "required": false
+    }
+  ]
+}

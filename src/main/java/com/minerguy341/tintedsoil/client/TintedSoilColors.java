@@ -9,6 +9,10 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.ColorResolver;
 import net.minecraft.world.level.GrassColor;
+import net.minecraft.world.level.biome.Biome;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Tint providers for the two blocks.
@@ -26,7 +30,34 @@ public final class TintedSoilColors {
     public static final int GRASS_TINT_INDEX = 0;
     public static final int SOIL_TINT_INDEX = 1;
 
-    public static final ColorResolver SOIL_COLOR_RESOLVER = (biome, x, z) -> {
+    /** Per-biome soil colour, resolved once and reused; cleared with the colormap. */
+    private static final Map<Biome, Integer> BIOME_SOIL = new ConcurrentHashMap<>();
+
+    public static final ColorResolver SOIL_COLOR_RESOLVER =
+            (biome, x, z) -> BIOME_SOIL.computeIfAbsent(biome, TintedSoilColors::resolveBiomeSoil);
+
+    /**
+     * A biome's soil colour.
+     *
+     * <p>If the biome declares its own {@code grass_color}, that choice is inherited: the
+     * colour is matched back to a cell of vanilla's grass colormap and the soil colormap is
+     * sampled at the same cell. Biomes O' Plenty and Oh The Biomes We've Gone set grass
+     * colours on their distinctive biomes, so their soil follows their art direction with no
+     * per-biome data on this end. Everything else falls back to the biome's own climate.
+     *
+     * <p>The override is read rather than {@code getGrassColor(x, z)} on purpose — the
+     * latter applies swamp's and dark forest's positional colour modifiers, which would make
+     * soil flicker between shades across a biome.
+     */
+    private static int resolveBiomeSoil(Biome biome) {
+        Integer override = biome.getSpecialEffects().getGrassColorOverride().orElse(null);
+        if (override != null) {
+            float[] climate = GrassColorIndex.climateFor(override);
+            if (climate != null) {
+                return SoilColormap.get(climate[0], climate[1]);
+            }
+        }
+
         float temperature = Mth.clamp(biome.getBaseTemperature(), 0.0F, 1.0F);
         float downfall = 0.5F;
         // Biome is final, so the interface it gains from BiomeMixin is invisible to javac
@@ -35,7 +66,13 @@ public final class TintedSoilColors {
             downfall = Mth.clamp(source.tintedsoil$downfall(), 0.0F, 1.0F);
         }
         return SoilColormap.get(temperature, downfall);
-    };
+    }
+
+    /** Dropped whenever the client clears its tint caches, which includes resource reloads. */
+    public static void invalidate() {
+        BIOME_SOIL.clear();
+        GrassColorIndex.invalidate();
+    }
 
     public static final BlockColor GRASS_BLOCK_COLOR = (state, view, pos, tintIndex) -> {
         if (tintIndex == SOIL_TINT_INDEX) {
@@ -67,7 +104,9 @@ public final class TintedSoilColors {
         if (view == null || pos == null) {
             return SoilColormap.defaultColor();
         }
-        return view.getBlockTint(pos, SOIL_COLOR_RESOLVER);
+        // Two blends compose here: vanilla blurs the resolver across biomes, and
+        // SoilTypeBlend blurs soil types across blocks.
+        return SoilTypeBlend.apply(view, pos, view.getBlockTint(pos, SOIL_COLOR_RESOLVER));
     }
 
     /**

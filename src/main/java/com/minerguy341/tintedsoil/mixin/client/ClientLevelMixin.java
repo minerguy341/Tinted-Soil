@@ -43,6 +43,7 @@ public abstract class ClientLevelMixin {
         }
         // Reached on resource reload too, which is when a resource pack's colormap changes.
         SoilColormap.invalidate();
+        TintedSoilColors.invalidate();
     }
 
     @Inject(method = "onChunkLoaded", at = @At("TAIL"))

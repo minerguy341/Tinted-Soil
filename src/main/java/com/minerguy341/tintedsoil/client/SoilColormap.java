@@ -114,8 +114,18 @@ public final class SoilColormap {
         return (r << 16) | (g << 8) | b;
     }
 
+    /**
+     * Converts a colour you want to see into the tint that produces it, by dividing out the
+     * greyscale texture's mean luminance. The stored colormap is pre-divided the same way.
+     */
+    public static int toTint(int rendered) {
+        int r = channel((rendered >> 16) & 0xFF);
+        int g = channel((rendered >> 8) & 0xFF);
+        int b = channel(rendered & 0xFF);
+        return (r << 16) | (g << 8) | b;
+    }
+
     private static int channel(double rendered) {
-        // The stored colormap is pre-divided by the texture's luminance; match that here.
         return Math.min(255, Math.max(0, (int) Math.round(rendered / MEAN_LUMINANCE)));
     }
 

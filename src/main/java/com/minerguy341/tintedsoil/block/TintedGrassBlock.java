@@ -8,8 +8,10 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.GrassBlock;
 import net.minecraft.world.level.block.SnowyDirtBlock;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
 //? if >=1.21 {
 import com.mojang.serialization.MapCodec;
 //?}
@@ -35,6 +37,13 @@ public class TintedGrassBlock extends GrassBlock {
 
     public TintedGrassBlock(BlockBehaviour.Properties properties) {
         super(properties);
+        this.registerDefaultState(this.defaultBlockState().setValue(SoilType.PROPERTY, SoilType.DEFAULT));
+    }
+
+    @Override
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
+        super.createBlockStateDefinition(builder);
+        builder.add(SoilType.PROPERTY);
     }
 
     //? if >=1.21 {
@@ -47,8 +56,10 @@ public class TintedGrassBlock extends GrassBlock {
     @Override
     public void randomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
         if (!SpreadingSnowyDirtBlockInvoker.tintedsoil$canBeGrass(state, level, pos)) {
-            // Too dark or drowned: die back to bare soil, mirroring vanilla.
-            level.setBlockAndUpdate(pos, TintedSoilBlocks.TINTED_SOIL.defaultBlockState());
+            // Too dark or drowned: die back to bare soil, mirroring vanilla. The soil type
+            // rides along so a patch does not forget it was peat just because it lost grass.
+            level.setBlockAndUpdate(pos, TintedSoilBlocks.TINTED_SOIL.defaultBlockState()
+                    .setValue(SoilType.PROPERTY, state.getValue(SoilType.PROPERTY)));
             return;
         }
 
@@ -59,14 +70,18 @@ public class TintedGrassBlock extends GrassBlock {
         BlockState spreading = this.defaultBlockState();
         for (int attempt = 0; attempt < 4; attempt++) {
             BlockPos target = pos.offset(random.nextInt(3) - 1, random.nextInt(5) - 3, random.nextInt(3) - 1);
-            if (!level.getBlockState(target).is(TintedSoilBlocks.TINTED_SOIL)) {
+            BlockState targetState = level.getBlockState(target);
+            if (!targetState.is(TintedSoilBlocks.TINTED_SOIL)) {
                 continue;
             }
             if (!SpreadingSnowyDirtBlockInvoker.tintedsoil$canPropagate(spreading, level, target)) {
                 continue;
             }
             boolean snowy = level.getBlockState(target.above()).is(Blocks.SNOW);
-            level.setBlockAndUpdate(target, spreading.setValue(SnowyDirtBlock.SNOWY, snowy));
+            // Grass takes on the soil it grows onto, so spreading never rewrites soil types.
+            level.setBlockAndUpdate(target, spreading
+                    .setValue(SnowyDirtBlock.SNOWY, snowy)
+                    .setValue(SoilType.PROPERTY, targetState.getValue(SoilType.PROPERTY)));
         }
     }
 }

@@ -246,6 +246,21 @@ REPLACEABLE_COARSE_SOIL = [
     ("minecraft:coarse_dirt", True),
 ]
 
+# Which soil type a replaced block records, as a `soil_type` blockstate value. This is
+# colour only: the type gives the block a characteristic cast that survives worldgen, and
+# SoilTypeBlend blurs it across neighbours so type boundaries fade instead of cutting off.
+# "default" has no tag -- it is the fallback, and contributes no colour of its own.
+SOIL_TYPES = {
+    "podzol": [("minecraft:podzol", True)],
+    "lush": [("biomeswevegone:lush_dirt", False), ("biomeswevegone:lush_grass_block", False)],
+    "sandy": [("biomeswevegone:sandy_dirt", False)],
+    "peat": [("biomeswevegone:peat", False)],
+    "origin": [("biomesoplenty:origin_grass_block", False)],
+}
+
+# Must match SoilType.java, including order.
+SOIL_TYPE_VALUES = ["default", "podzol", "lush", "sandy", "peat", "origin"]
+
 # Vanilla tags each replacement joins, mirroring the vanilla block it stands in for.
 # Read out of the 1.21.1 client jar. Joining them is what makes other mods' tag-driven
 # data apply to the replacements.
@@ -298,6 +313,9 @@ def write_tags():
                    tag_file(REPLACEABLE_SOIL))
         write_json(os.path.join(RESOURCES, "data", NS, directory, "replaceable_coarse_soil.json"),
                    tag_file(REPLACEABLE_COARSE_SOIL))
+        for soil_type, entries in SOIL_TYPES.items():
+            write_json(os.path.join(RESOURCES, "data", NS, directory, "soil_type", soil_type + ".json"),
+                       tag_file(entries))
         for name, blocks in vanilla_tags().items():
             write_json(os.path.join(RESOURCES, "data", "minecraft", directory, name + ".json"),
                        {"replace": False, "values": blocks})
@@ -443,14 +461,19 @@ def write_blockstates(rotations=4):
         return [{"model": model} if y == 0 else {"model": model, "y": y}
                 for y in range(0, 360, 360 // rotations)]
 
+    # Every soil type shares its model -- they differ by tint, not geometry -- but each
+    # needs its own blockstate variant so the property is representable.
     for name in ("tinted_soil", "tinted_coarse_soil"):
-        write_json(os.path.join(states, name + ".json"),
-                   {"variants": {"": rotated(NS + ":block/" + name)}})
+        write_json(os.path.join(states, name + ".json"), {"variants": {
+            "soil_type=" + soil_type: rotated(NS + ":block/" + name)
+            for soil_type in SOIL_TYPE_VALUES
+        }})
 
-    write_json(os.path.join(states, "tinted_grass_block.json"), {"variants": {
-        "snowy=false": rotated(NS + ":block/tinted_grass_block"),
-        "snowy=true": {"model": NS + ":block/tinted_grass_block_snow"},
-    }})
+    variants = {}
+    for soil_type in SOIL_TYPE_VALUES:
+        variants["snowy=false,soil_type=" + soil_type] = rotated(NS + ":block/tinted_grass_block")
+        variants["snowy=true,soil_type=" + soil_type] = {"model": NS + ":block/tinted_grass_block_snow"}
+    write_json(os.path.join(states, "tinted_grass_block.json"), {"variants": variants})
 
 
 def argb(rgb):
