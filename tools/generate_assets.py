@@ -29,6 +29,7 @@ import zlib
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS = os.path.join(ROOT, "src", "main", "resources", "assets", "tintedsoil", "textures")
 TEXTURE_PATH = os.path.join(ASSETS, "block", "tinted_soil.png")
+COARSE_TEXTURE_PATH = os.path.join(ASSETS, "block", "tinted_coarse_soil.png")
 COLORMAP_PATH = os.path.join(ASSETS, "colormap", "soil.png")
 
 # --- Colour model ------------------------------------------------------------
@@ -109,23 +110,28 @@ class Rng:
         return self.next() / 0x7FFFFFFF
 
 
-def generate_texture(size=16, seed=0x50494C21):
-    """Light, desaturated granular soil: coarse clumps plus per-pixel speckle."""
+def generate_texture(size=16, seed=0x50494C21, clump=2, levels=6, spread=0.24):
+    """
+    Light, desaturated granular soil: blocky clumps plus per-pixel speckle.
+
+    `clump` is the width of a coherent patch in pixels and `spread` the peak-to-peak
+    luminance range, so raising both gives the chunkier, higher-contrast grain used for
+    coarse soil. Whatever the settings, the result is normalised to MEAN_LUMINANCE, which
+    is what lets one colormap serve every soil texture.
+    """
     rng = Rng(seed)
 
-    half = size // 2
-    coarse = [[rng.unit() for _ in range(half)] for _ in range(half)]
+    cells = max(1, size // clump)
+    patches = [[rng.unit() for _ in range(cells)] for _ in range(cells)]
     field = []
     for y in range(size):
         row = []
         for x in range(size):
-            clump = coarse[y // 2][x // 2]
-            row.append(0.55 * clump + 0.45 * rng.unit())
+            patch = patches[min(y // clump, cells - 1)][min(x // clump, cells - 1)]
+            row.append(0.55 * patch + 0.45 * rng.unit())
         field.append(row)
 
     # Quantise to a handful of shades so it reads as pixel art rather than noise.
-    levels = 6
-    spread = 0.24  # peak-to-peak luminance range before normalisation
     quantised = [[round(v * (levels - 1)) / (levels - 1) for v in row] for row in field]
 
     flat = [v for row in quantised for v in row]
@@ -200,6 +206,7 @@ RESOURCES = os.path.join(ROOT, "src", "main", "resources")
 NS = "tintedsoil"
 GRASS = NS + ":tinted_grass_block"
 SOIL = NS + ":tinted_soil"
+COARSE = NS + ":tinted_coarse_soil"
 
 # Verified against the shipped jars of each mod rather than guessed:
 #   biomesoplenty:origin_grass_block   - the only grass/dirt block BOP adds
@@ -226,28 +233,42 @@ REPLACEABLE_GRASS = [
 
 REPLACEABLE_SOIL = [
     ("minecraft:dirt", True),
-    ("minecraft:coarse_dirt", True),
     ("minecraft:podzol", True),
     ("biomeswevegone:lush_dirt", False),
     ("biomeswevegone:sandy_dirt", False),
     ("biomeswevegone:peat", False),
 ]
 
-# Vanilla tags that already contain grass_block/dirt, read out of the 1.21.1 client jar.
-# Joining them is what makes other mods' tag-driven data apply to the replacements.
-VANILLA_TAGS = {
-    "dirt": [GRASS, SOIL],
-    "mineable/shovel": [GRASS, SOIL],
-    "sniffer_diggable_block": [GRASS, SOIL],
-    "convertable_to_mud": [SOIL],
-    "animals_spawnable_on": [GRASS],
-    "foxes_spawnable_on": [GRASS],
-    "frogs_spawnable_on": [GRASS],
-    "parrots_spawnable_on": [GRASS],
-    "rabbits_spawnable_on": [GRASS],
-    "wolves_spawnable_on": [GRASS],
-    "valid_spawn": [GRASS],
+# Becomes tinted coarse soil, which grass will not spread onto.
+REPLACEABLE_COARSE_SOIL = [
+    ("minecraft:coarse_dirt", True),
+]
+
+# Vanilla tags each replacement joins, mirroring the vanilla block it stands in for.
+# Read out of the 1.21.1 client jar. Joining them is what makes other mods' tag-driven
+# data apply to the replacements.
+#
+# Because coarse soil is its own block it reproduces coarse dirt's tags exactly, including
+# armadillo_spawnable_on. Plain tinted soil deliberately mirrors `dirt` only: podzol also
+# folds into it, and inheriting podzol's tags would widen them -- foxes would spawn on all
+# soil, mushrooms would grow on it everywhere -- rather than preserve behaviour.
+VANILLA_TAGS_BY_BLOCK = {
+    GRASS: ["dirt", "mineable/shovel", "sniffer_diggable_block", "animals_spawnable_on",
+            "foxes_spawnable_on", "frogs_spawnable_on", "parrots_spawnable_on",
+            "rabbits_spawnable_on", "wolves_spawnable_on", "valid_spawn"],
+    SOIL: ["dirt", "mineable/shovel", "sniffer_diggable_block", "convertable_to_mud"],
+    COARSE: ["dirt", "mineable/shovel", "sniffer_diggable_block", "convertable_to_mud",
+             "armadillo_spawnable_on", "foxes_spawnable_on", "wolves_spawnable_on"],
 }
+
+
+def vanilla_tags():
+    """Inverts VANILLA_TAGS_BY_BLOCK into tag -> blocks, keeping block order stable."""
+    out = {}
+    for block in (GRASS, SOIL, COARSE):
+        for tag in VANILLA_TAGS_BY_BLOCK[block]:
+            out.setdefault(tag, []).append(block)
+    return out
 
 TAG_DIRS = ["tags/block", "tags/blocks"]        # 1.21+, 1.20.x
 LOOT_DIRS = ["loot_table", "loot_tables"]       # 1.21+, 1.20.x
@@ -273,7 +294,9 @@ def write_tags():
                    tag_file(REPLACEABLE_GRASS))
         write_json(os.path.join(RESOURCES, "data", NS, directory, "replaceable_soil.json"),
                    tag_file(REPLACEABLE_SOIL))
-        for name, blocks in VANILLA_TAGS.items():
+        write_json(os.path.join(RESOURCES, "data", NS, directory, "replaceable_coarse_soil.json"),
+                   tag_file(REPLACEABLE_COARSE_SOIL))
+        for name, blocks in vanilla_tags().items():
             write_json(os.path.join(RESOURCES, "data", "minecraft", directory, name + ".json"),
                        {"replace": False, "values": blocks})
 
@@ -302,15 +325,16 @@ def write_loot_tables():
         base = os.path.join(RESOURCES, "data", NS, directory, "blocks")
 
         # Bare soil simply drops itself.
-        write_json(os.path.join(base, "tinted_soil.json"), {
-            "type": "minecraft:block",
-            "random_sequence": NS + ":blocks/tinted_soil",
-            "pools": [{
-                "rolls": 1.0, "bonus_rolls": 0.0,
-                "entries": [{"type": "minecraft:item", "name": SOIL}],
-                "conditions": [{"condition": "minecraft:survives_explosion"}],
-            }],
-        })
+        for name, item in (("tinted_soil", SOIL), ("tinted_coarse_soil", COARSE)):
+            write_json(os.path.join(base, name + ".json"), {
+                "type": "minecraft:block",
+                "random_sequence": NS + ":blocks/" + name,
+                "pools": [{
+                    "rolls": 1.0, "bonus_rolls": 0.0,
+                    "entries": [{"type": "minecraft:item", "name": item}],
+                    "conditions": [{"condition": "minecraft:survives_explosion"}],
+                }],
+            })
 
         # Grass drops soil unless mined with silk touch, exactly like vanilla grass.
         write_json(os.path.join(base, "tinted_grass_block.json"), {
@@ -349,12 +373,14 @@ def write_models():
 
     # Vanilla's dirt model has no tint index, so the cube is spelled out here instead of
     # inheriting cube_all. Tint index 1 is soil throughout the mod.
-    write_json(os.path.join(models, "block", "tinted_soil.json"), {
-        "parent": "minecraft:block/block",
-        "textures": {"particle": soil_texture, "all": soil_texture},
-        "elements": [{"from": [0, 0, 0], "to": [16, 16, 16],
-                      "faces": cube_faces("#all", tint=1)}],
-    })
+    for name in ("tinted_soil", "tinted_coarse_soil"):
+        texture = NS + ":block/" + name
+        write_json(os.path.join(models, "block", name + ".json"), {
+            "parent": "minecraft:block/block",
+            "textures": {"particle": texture, "all": texture},
+            "elements": [{"from": [0, 0, 0], "to": [16, 16, 16],
+                          "faces": cube_faces("#all", tint=1)}],
+        })
 
     # Same two-element structure as minecraft:block/grass_block: an opaque cube plus a
     # grass overlay on the four sides. The difference is that the dirt half is tinted
@@ -403,7 +429,7 @@ def write_models():
 
     # Pre-1.21.4 inventory model. Newer versions read assets/<ns>/items/ instead but still
     # resolve this path, so both can ship side by side.
-    for name in ("tinted_soil", "tinted_grass_block"):
+    for name in ("tinted_soil", "tinted_coarse_soil", "tinted_grass_block"):
         write_json(os.path.join(models, "item", name + ".json"),
                    {"parent": NS + ":block/" + name})
 
@@ -415,8 +441,9 @@ def write_blockstates(rotations=4):
         return [{"model": model} if y == 0 else {"model": model, "y": y}
                 for y in range(0, 360, 360 // rotations)]
 
-    write_json(os.path.join(states, "tinted_soil.json"),
-               {"variants": {"": rotated(NS + ":block/tinted_soil")}})
+    for name in ("tinted_soil", "tinted_coarse_soil"):
+        write_json(os.path.join(states, name + ".json"),
+                   {"variants": {"": rotated(NS + ":block/" + name)}})
 
     write_json(os.path.join(states, "tinted_grass_block.json"), {"variants": {
         "snowy=false": rotated(NS + ":block/tinted_grass_block"),
@@ -434,15 +461,16 @@ def write_item_definitions(soil_tint):
     """1.21.4+ item model definitions, which replaced code-registered ItemColor providers."""
     items = os.path.join(RESOURCES, "assets", NS, "items")
 
-    write_json(os.path.join(items, "tinted_soil.json"), {"model": {
-        "type": "minecraft:model",
-        "model": NS + ":block/tinted_soil",
-        # Index 0 is unused by the soil model but has to exist to reach index 1.
-        "tints": [
-            {"type": "minecraft:constant", "value": argb(0xFFFFFF)},
-            {"type": "minecraft:constant", "value": argb(soil_tint)},
-        ],
-    }})
+    for name in ("tinted_soil", "tinted_coarse_soil"):
+        write_json(os.path.join(items, name + ".json"), {"model": {
+            "type": "minecraft:model",
+            "model": NS + ":block/" + name,
+            # Index 0 is unused by the soil models but has to exist to reach index 1.
+            "tints": [
+                {"type": "minecraft:constant", "value": argb(0xFFFFFF)},
+                {"type": "minecraft:constant", "value": argb(soil_tint)},
+            ],
+        }})
 
     write_json(os.path.join(items, "tinted_grass_block.json"), {"model": {
         "type": "minecraft:model",
@@ -458,6 +486,7 @@ def write_lang():
     write_json(os.path.join(RESOURCES, "assets", NS, "lang", "en_us.json"), {
         "block." + NS + ".tinted_grass_block": "Tinted Grass Block",
         "block." + NS + ".tinted_soil": "Tinted Soil",
+        "block." + NS + ".tinted_coarse_soil": "Tinted Coarse Soil",
     })
 
 
@@ -465,6 +494,10 @@ def main():
     texture = generate_texture()
     luminance = texture_mean_luminance(texture)
     write_png(TEXTURE_PATH, len(texture[0]), len(texture), texture)
+
+    # Chunkier, higher-contrast grain, normalised to the same mean so it shares the colormap.
+    coarse = generate_texture(seed=0x43524150, clump=4, levels=4, spread=0.34)
+    write_png(COARSE_TEXTURE_PATH, len(coarse[0]), len(coarse), coarse)
 
     colormap = generate_colormap(luminance)
     write_png(COLORMAP_PATH, len(colormap[0]), len(colormap), colormap)
@@ -482,6 +515,8 @@ def main():
     write_lang()
 
     print("texture   %s (mean luminance %.4f)" % (os.path.relpath(TEXTURE_PATH, ROOT), luminance))
+    print("texture   %s (mean luminance %.4f)"
+          % (os.path.relpath(COARSE_TEXTURE_PATH, ROOT), texture_mean_luminance(coarse)))
     print("colormap  %s" % os.path.relpath(COLORMAP_PATH, ROOT))
     print("json      tags, loot tables, models, blockstates, item definitions, lang")
     print("inventory soil tint #%06X" % soil_tint)

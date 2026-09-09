@@ -17,6 +17,7 @@ public class TintedSoilFabric implements ModInitializer {
         ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.NATURAL_BLOCKS).register(entries -> {
             entries.accept(TintedSoilBlocks.TINTED_GRASS_BLOCK_ITEM);
             entries.accept(TintedSoilBlocks.TINTED_SOIL_ITEM);
+            entries.accept(TintedSoilBlocks.TINTED_COARSE_SOIL_ITEM);
         });
 
         TintedSoil.onCommonSetup();

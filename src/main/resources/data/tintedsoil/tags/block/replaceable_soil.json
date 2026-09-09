@@ -2,7 +2,6 @@
   "replace": false,
   "values": [
     "minecraft:dirt",
-    "minecraft:coarse_dirt",
     "minecraft:podzol",
     {
       "id": "biomeswevegone:lush_dirt",

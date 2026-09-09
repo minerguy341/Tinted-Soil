@@ -1,11 +1,14 @@
 # Tinted Soil
 
-Replaces vanilla and worldgen-mod grass/dirt with **two** biome-tinted blocks, so soil and
-grass blend smoothly across biome borders instead of cutting off at a hard line — which is
-most visible on hills and cliffs, where two soil types meet on a vertical face.
+Replaces vanilla and worldgen-mod grass/dirt with biome-tinted blocks, so soil and grass
+blend smoothly across biome borders instead of cutting off at a hard line — which is most
+visible on hills and cliffs, where two soil types meet on a vertical face.
+
+Everything is driven by **two tint indices**:
 
 - `tintedsoil:tinted_grass_block` — two tints: grass (index 0) and the soil under it (index 1)
 - `tintedsoil:tinted_soil` — one tint: soil (index 1)
+- `tintedsoil:tinted_coarse_soil` — soil tint as above, but grass will not spread onto it
 
 Built with [Stonecutter](https://stonecutter.kikugie.dev/) from a single `src/` tree.
 
@@ -70,6 +73,8 @@ Replacement is driven by two block tags, applied during world generation:
 
 - `tintedsoil:replaceable_grass` → `tinted_grass_block`
 - `tintedsoil:replaceable_soil` → `tinted_soil`
+- `tintedsoil:replaceable_coarse_soil` → `tinted_coarse_soil` (checked first, so a block in
+  both soil tags ends up coarse)
 
 **These tags are the configuration.** There is no config file: add a modded soil to a tag
 and it starts being replaced; empty a tag with a datapack and that half switches off.
@@ -79,23 +84,32 @@ Shipped defaults, taken from the mods' own jars rather than guessed:
 | Tag | Entries |
 |-----|---------|
 | `replaceable_grass` | `minecraft:grass_block`, `biomesoplenty:origin_grass_block`, `biomeswevegone:lush_grass_block` |
-| `replaceable_soil` | `minecraft:dirt`, `minecraft:coarse_dirt`, `minecraft:podzol`, `biomeswevegone:lush_dirt`, `biomeswevegone:sandy_dirt`, `biomeswevegone:peat` |
+| `replaceable_soil` | `minecraft:dirt`, `minecraft:podzol`, `biomeswevegone:lush_dirt`, `biomeswevegone:sandy_dirt`, `biomeswevegone:peat` |
+| `replaceable_coarse_soil` | `minecraft:coarse_dirt` |
 
 Modded entries are marked `"required": false`, so the mods are optional at runtime and no
 compile-time dependency on either is needed.
 
-Coarse dirt and podzol map to **soil**, not grass: neither has a grass overlay, so sending
-them to the grass block would paint grass over badlands and old-growth taiga floors.
-Folding them in trades two vanilla behaviours for the smoother surface, because they stop
-being distinguishable from plain dirt:
+Coarse dirt and podzol both map to **soil**, not grass: neither has a grass overlay, so
+sending them to the grass block would paint grass over badlands and old-growth taiga floors.
 
-- tinted grass now spreads onto ground that used to be coarse dirt or podzol, where
-  vanilla grass never could, so those patches green over in time;
+Coarse dirt keeps its own block so that grass will not spread onto it, as in vanilla. That
+also lets it reproduce coarse dirt's exact tag set, `armadillo_spawnable_on` included, and
+lets a hoe turn it back into plain tinted soil rather than straight to farmland. It is a
+third *block*, not a third tint — it uses the same soil tint as everything else.
+
+Podzol has no such block and folds into plain tinted soil, which trades two vanilla
+behaviours for the smoother surface:
+
+- tinted grass now spreads onto ground that used to be podzol, where vanilla grass never
+  could, so old-growth taiga floors green over in time;
 - mushrooms lose podzol's grow-at-any-light-level rule, which keys off
-  `minecraft:mushroom_grow_block`. Adding the replacement to that tag is *not* the fix —
-  it would let mushrooms grow on every soil block in the world.
+  `minecraft:mushroom_grow_block`. Adding tinted soil to that tag is *not* the fix — it
+  would let mushrooms grow on every soil block in the world.
 
-Drop either id from `replaceable_soil` to get the vanilla behaviour back.
+Drop `minecraft:podzol` from `replaceable_soil` to get the vanilla behaviour back. Giving
+podzol the same treatment as coarse dirt — its own block — would fix both, at the cost of a
+fourth block.
 
 **Still excluded:** rooted dirt (drops hanging roots), mycelium (spreads, and grows
 mushrooms), mud, and BWG's overgrown/podzol dacite. Add them to the tags if you would
@@ -109,21 +123,28 @@ existing chunks are left alone.
 
 ## Inheriting other mods' data
 
-The replacements join every vanilla tag that `grass_block`/`dirt` belong to (read out of the
-1.21.1 client jar): `dirt`, `mineable/shovel`, `sniffer_diggable_block`,
-`convertable_to_mud`, and the `*_spawnable_on` family. Membership in `minecraft:dirt` is the
-important one — most other tags, and most other mods' data, reference it transitively, so
-nutrient systems and similar tag-driven features apply unchanged.
+Each replacement joins the vanilla tags of the block it stands in for, read out of the
+1.21.1 client jar: `dirt`, `mineable/shovel`, `sniffer_diggable_block`,
+`convertable_to_mud`, `armadillo_spawnable_on` and the `*_spawnable_on` family. Membership
+in `minecraft:dirt` is the important one — most other tags, and most other mods' data,
+reference it transitively, so nutrient systems and similar tag-driven features apply
+unchanged.
 
-Two interactions vanilla hardcodes in static maps rather than in data — shovel → path and
-hoe → farmland — are registered in `TintedSoilInteractions`.
+Plain tinted soil deliberately mirrors `dirt` only. Podzol folds into it, and inheriting
+podzol's tags as well would *widen* them rather than preserve behaviour — foxes would spawn
+on all soil, mushrooms would grow on it everywhere.
+
+Interactions vanilla hardcodes in static maps rather than in data are registered in
+`TintedSoilInteractions`: shovel → path for all three, hoe → farmland for grass and soil,
+and hoe → plain soil for coarse, matching vanilla's coarse-dirt-to-dirt behaviour.
 
 Grass spreading needed real code: `SpreadingSnowyDirtBlock#randomTick` hardcodes
 `Blocks.DIRT` and `Blocks.GRASS_BLOCK`, so once a world is made of tinted blocks, vanilla's
 spread would find nothing to grow onto and grass would simply stop spreading.
 `TintedGrassBlock#randomTick` is a faithful port that walks tinted soil instead, calling
 vanilla's own private `canBeGrass`/`canPropagate` through an invoker mixin so the survival
-rules stay identical rather than approximated.
+rules stay identical rather than approximated. It only ever spreads onto `tinted_soil`,
+never `tinted_coarse_soil` — that omission is the whole mechanism keeping coarse soil bare.
 
 ## Building
 

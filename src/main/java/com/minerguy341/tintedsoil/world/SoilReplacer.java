@@ -30,6 +30,11 @@ public final class SoilReplacer {
             return replacement;
         }
 
+        // Coarse is checked first so a block in both tags stays bare.
+        if (state.is(TintedSoilTags.REPLACEABLE_COARSE_SOIL)) {
+            return TintedSoilBlocks.TINTED_COARSE_SOIL.defaultBlockState();
+        }
+
         if (state.is(TintedSoilTags.REPLACEABLE_SOIL)) {
             return TintedSoilBlocks.TINTED_SOIL.defaultBlockState();
         }

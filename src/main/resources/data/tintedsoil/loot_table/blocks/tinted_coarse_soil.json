@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:block",
+  "random_sequence": "tintedsoil:blocks/tinted_coarse_soil",
+  "pools": [
+    {
+      "rolls": 1.0,
+      "bonus_rolls": 0.0,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "tintedsoil:tinted_coarse_soil"
+        }
+      ],
+      "conditions": [
+        {
+          "condition": "minecraft:survives_explosion"
+        }
+      ]
+    }
+  ]
+}

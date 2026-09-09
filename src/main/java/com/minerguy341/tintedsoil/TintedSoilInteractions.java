@@ -20,6 +20,8 @@ public final class TintedSoilInteractions {
                 .put(TintedSoilBlocks.TINTED_GRASS_BLOCK, Blocks.DIRT_PATH.defaultBlockState());
         ShovelItemAccessor.tintedsoil$getFlattenables()
                 .put(TintedSoilBlocks.TINTED_SOIL, Blocks.DIRT_PATH.defaultBlockState());
+        ShovelItemAccessor.tintedsoil$getFlattenables()
+                .put(TintedSoilBlocks.TINTED_COARSE_SOIL, Blocks.DIRT_PATH.defaultBlockState());
 
         Pair<java.util.function.Predicate<net.minecraft.world.item.context.UseOnContext>,
                 java.util.function.Consumer<net.minecraft.world.item.context.UseOnContext>> toFarmland =
@@ -27,5 +29,10 @@ public final class TintedSoilInteractions {
 
         HoeItemAccessor.tintedsoil$getTillables().put(TintedSoilBlocks.TINTED_GRASS_BLOCK, toFarmland);
         HoeItemAccessor.tintedsoil$getTillables().put(TintedSoilBlocks.TINTED_SOIL, toFarmland);
+
+        // Vanilla hoes turn coarse dirt into plain dirt rather than farmland; mirror that.
+        HoeItemAccessor.tintedsoil$getTillables().put(TintedSoilBlocks.TINTED_COARSE_SOIL, Pair.of(
+                HoeItem::onlyIfAirAbove,
+                HoeItem.changeIntoState(TintedSoilBlocks.TINTED_SOIL.defaultBlockState())));
     }
 }

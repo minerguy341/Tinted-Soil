@@ -21,6 +21,14 @@ public final class TintedSoilTags {
     public static final TagKey<Block> REPLACEABLE_SOIL =
             TagKey.create(Registries.BLOCK, TintedSoil.id("replaceable_soil"));
 
+    /**
+     * Blocks that become the tinted <em>coarse</em> soil block, which grass will not
+     * spread onto. Checked before {@link #REPLACEABLE_SOIL}, so a block listed in both
+     * ends up coarse.
+     */
+    public static final TagKey<Block> REPLACEABLE_COARSE_SOIL =
+            TagKey.create(Registries.BLOCK, TintedSoil.id("replaceable_coarse_soil"));
+
     private TintedSoilTags() {
     }
 }

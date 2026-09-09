@@ -31,6 +31,7 @@ public class TintedSoilNeoForge {
         if (event.getTabKey() == CreativeModeTabs.NATURAL_BLOCKS) {
             event.accept(TintedSoilBlocks.TINTED_GRASS_BLOCK_ITEM);
             event.accept(TintedSoilBlocks.TINTED_SOIL_ITEM);
+            event.accept(TintedSoilBlocks.TINTED_COARSE_SOIL_ITEM);
         }
     }
 

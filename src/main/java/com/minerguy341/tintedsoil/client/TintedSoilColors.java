@@ -76,13 +76,14 @@ public final class TintedSoilColors {
      */
     public static void registerBlockColors(BlockColorRegistrar blocks) {
         blocks.register(GRASS_BLOCK_COLOR, TintedSoilBlocks.TINTED_GRASS_BLOCK);
-        blocks.register(SOIL_BLOCK_COLOR, TintedSoilBlocks.TINTED_SOIL);
+        blocks.register(SOIL_BLOCK_COLOR, TintedSoilBlocks.TINTED_SOIL, TintedSoilBlocks.TINTED_COARSE_SOIL);
     }
 
     //? if <1.21.2 {
     public static void registerItemColors(ItemColorRegistrar items) {
         items.register(GRASS_ITEM_COLOR, TintedSoilBlocks.TINTED_GRASS_BLOCK_ITEM);
-        items.register(SOIL_ITEM_COLOR, TintedSoilBlocks.TINTED_SOIL_ITEM);
+        items.register(SOIL_ITEM_COLOR, TintedSoilBlocks.TINTED_SOIL_ITEM,
+                TintedSoilBlocks.TINTED_COARSE_SOIL_ITEM);
     }
 
     @FunctionalInterface
