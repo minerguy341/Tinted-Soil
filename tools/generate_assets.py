@@ -205,11 +205,19 @@ SOIL = NS + ":tinted_soil"
 #   biomesoplenty:origin_grass_block   - the only grass/dirt block BOP adds
 #   biomeswevegone:lush_*/sandy_dirt/peat - BWG's entries in the minecraft:dirt tag
 #
-# Deliberately excluded: coarse dirt, rooted dirt, podzol, mycelium, mud, and BWG's
-# overgrown/podzol dacite. Each is visually distinct and behaves differently (grass
-# will not spread onto coarse dirt, rooted dirt drops hanging roots), and folding
-# them into one tinted block would lose that. Add them to these tags with a datapack
-# if you would rather have the smoother surface.
+# Coarse dirt and podzol are included as bare soil: neither has a grass overlay, so
+# mapping them to the grass block would paint grass over badlands and old-growth taiga
+# floors. Folding them in does change two vanilla behaviours, because they stop being
+# distinguishable from plain dirt:
+#   - tinted grass will now spread onto ground that used to be coarse dirt or podzol,
+#     where vanilla grass never could;
+#   - mushrooms lose podzol's grow-at-any-light-level rule, since that keys off
+#     minecraft:mushroom_grow_block and the replacement is not in it. Adding the
+#     replacement to that tag would instead let mushrooms grow on every soil block.
+#
+# Still excluded: rooted dirt (drops hanging roots), mycelium (spreads, and grows
+# mushrooms), mud, and BWG's overgrown/podzol dacite. Add them to these tags with a
+# datapack if you would rather have the smoother surface.
 REPLACEABLE_GRASS = [
     ("minecraft:grass_block", True),
     ("biomesoplenty:origin_grass_block", False),
@@ -218,6 +226,8 @@ REPLACEABLE_GRASS = [
 
 REPLACEABLE_SOIL = [
     ("minecraft:dirt", True),
+    ("minecraft:coarse_dirt", True),
+    ("minecraft:podzol", True),
     ("biomeswevegone:lush_dirt", False),
     ("biomeswevegone:sandy_dirt", False),
     ("biomeswevegone:peat", False),
