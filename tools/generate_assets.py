@@ -143,9 +143,11 @@ def generate_texture(size=16, seed=0x50494C21, clump=2, levels=6, spread=0.24):
         for v in row:
             lum = MEAN_LUMINANCE + (v - mean) * spread
             lum = min(max(lum, 0.0), 1.0)
-            # Very slight warmth so untinted previews do not look like concrete.
+            # Strictly neutral: R == G == B. Any hue baked in here would multiply against
+            # the tint and pull every biome's soil toward it, so all colour comes from the
+            # colormap and none from the texture.
             value = int(round(lum * 255))
-            out.append((value, int(round(value * 0.992)), int(round(value * 0.978))))
+            out.append((value, value, value))
         rows.append(out)
     return rows
 

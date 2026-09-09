@@ -23,9 +23,13 @@ Built with [Stonecutter](https://stonecutter.kikugie.dev/) from a single `src/` 
 Block tints are **multiplicative** — the rendered colour is `texel × tint`. Vanilla
 `dirt.png` is already a saturated brown, so no tint can push it toward pale sand; it can
 only be darkened. Tinted Soil therefore does what vanilla does for grass: the texture
-(`textures/block/tinted_soil.png`) is a light, desaturated grain carrying only the
+(`textures/block/tinted_soil.png`) is a light, strictly greyscale grain carrying only the
 *pattern*, and all of the colour comes from a colormap
 (`textures/colormap/soil.png`), indexed exactly like vanilla's `grass.png`.
+
+The base textures are neutral by construction — `R == G == B` for every pixel. Any hue
+baked into a texture would multiply against the tint and pull every biome's soil toward it,
+so the tint is the only thing deciding colour.
 
 The colour model blends four anchors over (temperature, downfall):
 

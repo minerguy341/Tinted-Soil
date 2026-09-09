@@ -29,7 +29,7 @@ public final class SoilColormap {
     private static final int[] HUMID = {104, 72, 46};
     private static final int[] SAND = {206, 183, 138};
     private static final int[] COLD = {146, 138, 128};
-    private static final double MEAN_LUMINANCE = 0.851;
+    private static final double MEAN_LUMINANCE = 0.860;
     private static final double SAND_TEMP_EXP = 1.5;
     private static final double SAND_DRY_EXP = 3.0;
     private static final double COLD_EXP = 2.0;
