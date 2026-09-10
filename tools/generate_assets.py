@@ -399,7 +399,7 @@ def write_models():
         "bottom": soil_texture,
         "side": soil_texture,
         "top": "minecraft:block/grass_block_top",
-        "overlay": "minecraft:block/grass_block_side_overlay",
+        "overlay": NS + ":block/grass_overlay_default",
     }
     soil_cube = {"from": [0, 0, 0], "to": [16, 16, 16], "faces": {
         "down": {"uv": [0, 0, 16, 16], "texture": "#bottom", "cullface": "down", "tintindex": 1},
@@ -426,13 +426,36 @@ def write_models():
         "elements": [soil_cube, grass_pebbles],
     })
 
-    write_json(os.path.join(models, "block", "tinted_grass_block_overlay.json"), {
+    # Podzol's crust, over tinted dirt. The sides take the band that
+    # SoilSpriteSource subtracts out of podzol_side, so the dirt below it stays tinted and
+    # keeps blending; the top is podzol all the way across and simply covers the dirt.
+    write_json(os.path.join(models, "block", "tinted_podzol_overlay.json"), {
         "parent": "minecraft:block/block",
         "render_type": RENDER_TYPE,
-        "textures": {"particle": soil_texture,
-                     "overlay": "minecraft:block/grass_block_side_overlay"},
-        "elements": [grass_overlay],
+        "textures": {
+            "particle": NS + ":block/podzol_overlay_top",
+            "side": NS + ":block/podzol_overlay_side",
+            "top": NS + ":block/podzol_overlay_top",
+        },
+        "elements": [{"from": [0, 0, 0], "to": [16, 16, 16], "faces": dict(
+            cube_faces("#side", faces=("north", "south", "west", "east")),
+            up={"uv": [0, 0, 16, 16], "texture": "#top", "cullface": "up"},
+        )}],
     })
+
+    # One fringe model per soil type. A worldgen mod's grass does not always wear vanilla's
+    # fringe -- BWG's lush grass has a longer one reaching further down the block -- so the
+    # overlay sprite is per type, and SoilSpriteSource fills each from the matching mod's
+    # texture when it is installed and from vanilla's when it is not. The model always names
+    # our own sprite, so nothing here depends on a mod being present.
+    for soil_type in SOIL_TYPE_VALUES:
+        write_json(os.path.join(models, "block", "tinted_grass_block_overlay_%s.json" % soil_type), {
+            "parent": "minecraft:block/block",
+            "render_type": RENDER_TYPE,
+            "textures": {"particle": soil_texture,
+                         "overlay": NS + ":block/grass_overlay_" + soil_type},
+            "elements": [grass_overlay],
+        })
 
     # Blockstate multipart is a world-render mechanism; a held or dropped item renders one
     # model. So the inventory icon needs the two halves recombined into a single model.
@@ -478,11 +501,19 @@ def write_blockstates(rotations=4):
 
     # Every soil type shares its model -- they differ by tint, not geometry -- but each
     # needs its own blockstate variant so the property is representable.
-    for name in ("tinted_dirt", "tinted_coarse_dirt"):
-        write_json(os.path.join(states, name + ".json"), {"variants": {
-            "soil_type=" + soil_type: rotated(NS + ":block/" + name)
-            for soil_type in SOIL_TYPE_VALUES
-        }})
+    # Coarse dirt has no crust of its own, so it stays a plain variants map.
+    write_json(os.path.join(states, "tinted_coarse_dirt.json"), {"variants": {
+        "soil_type=" + soil_type: rotated(NS + ":block/tinted_coarse_dirt")
+        for soil_type in SOIL_TYPE_VALUES
+    }})
+
+    # Plain dirt is multipart so podzol can be the soil cube plus a crust laid over it,
+    # rather than a separate model or a tint pretending to be one.
+    write_json(os.path.join(states, "tinted_dirt.json"), {"multipart": [
+        {"apply": rotated(NS + ":block/tinted_dirt")},
+        {"when": {"soil_type": "podzol"},
+         "apply": {"model": NS + ":block/tinted_podzol_overlay"}},
+    ]})
 
     # Multipart rather than variants, because the soil cube and the grass overlay are now
     # separate models that both have to render. Parts apply in order, so the overlay's
@@ -498,8 +529,14 @@ def write_blockstates(rotations=4):
     write_json(os.path.join(states, "tinted_grass_block.json"), {"multipart": [
         {"when": {"snowy": "false"},
          "apply": rotated(NS + ":block/tinted_grass_block")},
-        {"when": {"snowy": "false"},
-         "apply": {"model": NS + ":block/tinted_grass_block_overlay"}},
+    ] + [
+        # The fringe is chosen by soil type, so this part is per value rather than one entry
+        # for them all. Multipart conditions are equality tests, which is exactly what is
+        # wanted: a block wears the fringe of the grass it stands in for.
+        {"when": {"snowy": "false", "soil_type": soil_type},
+         "apply": {"model": NS + ":block/tinted_grass_block_overlay_" + soil_type}}
+        for soil_type in SOIL_TYPE_VALUES
+    ] + [
         {"when": {"snowy": "true"},
          "apply": {"model": NS + ":block/tinted_grass_block_snow"}},
     ]})

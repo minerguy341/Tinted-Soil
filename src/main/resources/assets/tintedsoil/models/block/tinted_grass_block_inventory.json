@@ -6,7 +6,7 @@
     "bottom": "tintedsoil:block/tinted_dirt",
     "side": "tintedsoil:block/tinted_dirt",
     "top": "minecraft:block/grass_block_top",
-    "overlay": "minecraft:block/grass_block_side_overlay",
+    "overlay": "tintedsoil:block/grass_overlay_default",
     "pebbles": "tintedsoil:block/tinted_dirt_pebbles"
   },
   "elements": [

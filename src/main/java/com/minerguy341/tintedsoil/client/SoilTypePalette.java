@@ -25,14 +25,26 @@ public final class SoilTypePalette {
         // time. Kept as the array's shape, and as the value that would apply if the runtime
         // derivation never ran.
         RENDERED[SoilType.DEFAULT.ordinal()] = SoilTextures.DEFAULT_SOIL_COLOR;
-        RENDERED[SoilType.PODZOL.ordinal()] = 0x6B4A28;     // dark orange-brown
-        RENDERED[SoilType.LUSH.ordinal()] = 0x57452C;       // dark, rich
+        // Unused: podzol's body is plain dirt -- vanilla's podzol_side is dirt.png below its
+        // top few rows -- so it takes the dirt colour and wears its crust as a model layer
+        // instead. Tinting toward orange-brown here would have double-counted the crust and
+        // stopped podzol blending with the ordinary ground it is made of.
+        RENDERED[SoilType.PODZOL.ordinal()] = SoilTextures.DEFAULT_SOIL_COLOR;
+        // Measured from biomeswevegone:textures/block/lush_dirt.png -- the mean of its 249
+        // soil pixels, with its 7 off-hue ones excluded the same way the tint excludes
+        // vanilla's pebbles. Rendering this on the derived greyscale reproduces BWG's own
+        // lush dirt darkness, so replaced lush ground matches the lush ground beside it.
+        RENDERED[SoilType.LUSH.ordinal()] = 0x534031;       // BWG lush dirt
         // Darkened from #C2A878 to fit the brightness ceiling: a tint is stored as
         // `rendered / MEAN_LUMINANCE` in 8 bits, and matching vanilla's high-contrast grain
         // dropped that mean to 0.7232, so no rendered channel above ~184 survives the
         // multiply. Same hue, scaled to fit rather than clipped, which would have skewed it.
         RENDERED[SoilType.SANDY.ordinal()] = 0xB89F72;      // pale and sandy
-        RENDERED[SoilType.PEAT.ordinal()] = 0x3B3025;       // near-black bog soil
+        // Measured from biomeswevegone:textures/block/peat.png, the mean of all 256 pixels:
+        // unlike the dirt textures it carries no off-hue specks at all, so nothing is
+        // excluded. Browner and lighter than the near-black it replaced, which was a guess
+        // at bog soil rather than a match for the block being stood in for.
+        RENDERED[SoilType.PEAT.ordinal()] = 0x514137;       // BWG peat
         RENDERED[SoilType.ORIGIN.ordinal()] = 0x8A6A45;     // warm mid brown
     }
 
@@ -43,7 +55,7 @@ public final class SoilTypePalette {
     public static int tint(SoilType type) {
         // Plain soil tracks the texture in play; the named types are deliberate colours for
         // specific modded soils and stay put.
-        int rendered = type == SoilType.DEFAULT
+        int rendered = type == SoilType.DEFAULT || type == SoilType.PODZOL
                 ? SoilTextures.defaultSoilColor()
                 : RENDERED[type.ordinal()];
         return SoilColormap.toTint(rendered);

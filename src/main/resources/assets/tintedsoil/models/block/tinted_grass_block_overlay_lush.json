@@ -3,7 +3,7 @@
   "render_type": "minecraft:cutout_mipped",
   "textures": {
     "particle": "tintedsoil:block/tinted_dirt",
-    "overlay": "minecraft:block/grass_block_side_overlay"
+    "overlay": "tintedsoil:block/grass_overlay_lush"
   },
   "elements": [
     {

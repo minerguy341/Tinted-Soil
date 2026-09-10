@@ -24,10 +24,56 @@
     },
     {
       "when": {
-        "snowy": "false"
+        "snowy": "false",
+        "soil_type": "default"
       },
       "apply": {
-        "model": "tintedsoil:block/tinted_grass_block_overlay"
+        "model": "tintedsoil:block/tinted_grass_block_overlay_default"
+      }
+    },
+    {
+      "when": {
+        "snowy": "false",
+        "soil_type": "podzol"
+      },
+      "apply": {
+        "model": "tintedsoil:block/tinted_grass_block_overlay_podzol"
+      }
+    },
+    {
+      "when": {
+        "snowy": "false",
+        "soil_type": "lush"
+      },
+      "apply": {
+        "model": "tintedsoil:block/tinted_grass_block_overlay_lush"
+      }
+    },
+    {
+      "when": {
+        "snowy": "false",
+        "soil_type": "sandy"
+      },
+      "apply": {
+        "model": "tintedsoil:block/tinted_grass_block_overlay_sandy"
+      }
+    },
+    {
+      "when": {
+        "snowy": "false",
+        "soil_type": "peat"
+      },
+      "apply": {
+        "model": "tintedsoil:block/tinted_grass_block_overlay_peat"
+      }
+    },
+    {
+      "when": {
+        "snowy": "false",
+        "soil_type": "origin"
+      },
+      "apply": {
+        "model": "tintedsoil:block/tinted_grass_block_overlay_origin"
       }
     },
     {

@@ -1,6 +1,7 @@
 package com.minerguy341.tintedsoil.client;
 
 import com.minerguy341.tintedsoil.TintedSoil;
+import com.minerguy341.tintedsoil.block.SoilType;
 import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.client.renderer.texture.SpriteContents;
 import net.minecraft.client.renderer.texture.atlas.SpriteSource;
@@ -54,6 +55,32 @@ public class SoilSpriteSource implements SpriteSource {
     /** Refinement passes for the hue, so pebbles stop dragging it off true. */
     private static final int HUE_PASSES = 3;
 
+    /** Vanilla's grass fringe, and the fallback for any type with no overlay of its own. */
+    private static final ResourceLocation GRASS_OVERLAY = vanilla("grass_block_side_overlay");
+
+    private static final ResourceLocation PODZOL_SIDE = vanilla("podzol_side");
+    private static final ResourceLocation PODZOL_TOP = vanilla("podzol_top");
+
+    /**
+     * Where each soil type's grass fringe comes from.
+     *
+     * <p>A worldgen mod's grass does not always wear vanilla's fringe: BWG's lush grass has
+     * a longer one that reaches further down the block. Replacing the grass block but
+     * keeping vanilla's fringe would flatten that difference, so each type names the texture
+     * it should borrow.
+     *
+     * <p>These are read through the resource manager, so a mod that is not installed simply
+     * falls back to vanilla's rather than leaving a missing texture. That is the reason the
+     * fringe is copied to a sprite of our own instead of being named directly in the model:
+     * a model naming {@code biomeswevegone:...} would break every install without BWG.
+     */
+    private static final java.util.Map<SoilType, ResourceLocation> OVERLAY_SOURCES =
+            java.util.Map.of(
+                    SoilType.LUSH, foreign("biomeswevegone",
+                            "textures/block/lush_grass_block_side_overlay.png"),
+                    SoilType.ORIGIN, foreign("biomesoplenty",
+                            "textures/block/origin_grass_block_side_overlay.png"));
+
     @Override
     public void run(ResourceManager resources, Output output) {
         BufferedImage dirt = read(resources, DIRT);
@@ -77,6 +104,9 @@ public class SoilSpriteSource implements SpriteSource {
         }
         double scale = PEAK / peak;
 
+        emitGrassOverlays(resources, output);
+        emitPodzolOverlays(resources, output, dirt);
+
         double luminance = emit(output, dirt, hue, scale, "tinted_dirt");
         SoilTextures.setMeanLuminance(luminance);
 
@@ -94,6 +124,97 @@ public class SoilSpriteSource implements SpriteSource {
                 dirt.getWidth(), dirt.getHeight(),
                 String.format("%02X%02X%02X", Math.round(hue[0]), Math.round(hue[1]), Math.round(hue[2])),
                 String.format("%.4f", luminance), String.format("%.4f", coarseLuminance));
+    }
+
+    /**
+     * Derives podzol's crust, so tinted dirt can wear it.
+     *
+     * <p>Podzol is dirt with a hat: {@code podzol_side.png} is {@code dirt.png} byte for
+     * byte below its top few rows, and vanilla ships no overlay for it because it composites
+     * the two into one texture instead. Subtracting one from the other recovers the crust --
+     * keep a pixel where the two differ, drop it where they agree.
+     *
+     * <p>Doing that rather than tinting toward a podzol colour keeps podzol's dirt as dirt:
+     * it blends with the ground around it like any other soil, and the crust sits on top
+     * untinted, exactly as vanilla's does.
+     *
+     * <p>The top face is a straight copy: podzol's top is podzol all the way across, with no
+     * dirt showing through to subtract.
+     */
+    private void emitPodzolOverlays(ResourceManager resources, Output output, BufferedImage dirt) {
+        BufferedImage side = read(resources, PODZOL_SIDE);
+        if (side != null && side.getWidth() == dirt.getWidth()
+                && side.getHeight() == dirt.getHeight()) {
+            int width = side.getWidth();
+            int height = side.getHeight();
+            NativeImage crust = new NativeImage(width, height, false);
+            int kept = 0;
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    int over = side.getRGB(x, y) & 0xFFFFFF;
+                    if (over == (dirt.getRGB(x, y) & 0xFFFFFF)) {
+                        setPixel(crust, x, y, 0);
+                    } else {
+                        setPixel(crust, x, y, 0xFF000000 | over);
+                        kept++;
+                    }
+                }
+            }
+            add(output, TintedSoil.id("block/podzol_overlay_side"), crust, width, height);
+            TintedSoil.LOGGER.info("Derived podzol crust: {} of {} pixels differ from dirt",
+                    kept, width * height);
+        } else if (side != null) {
+            TintedSoil.LOGGER.warn("{} is not the same size as dirt; podzol crust skipped",
+                    PODZOL_SIDE);
+        }
+
+        BufferedImage top = read(resources, PODZOL_TOP);
+        if (top != null) {
+            NativeImage copy = new NativeImage(top.getWidth(), top.getHeight(), false);
+            for (int y = 0; y < top.getHeight(); y++) {
+                for (int x = 0; x < top.getWidth(); x++) {
+                    setPixel(copy, x, y, top.getRGB(x, y));
+                }
+            }
+            add(output, TintedSoil.id("block/podzol_overlay_top"), copy,
+                    top.getWidth(), top.getHeight());
+        }
+    }
+
+    /**
+     * Copies a grass fringe per soil type, falling back to vanilla's where a mod is absent.
+     *
+     * <p>Untouched otherwise: the fringe is already the right colour and shape, and the
+     * model tints it with the grass colour exactly as vanilla does. All this does is give
+     * every type a sprite under our own namespace that is guaranteed to exist.
+     */
+    private void emitGrassOverlays(ResourceManager resources, Output output) {
+        BufferedImage fallback = read(resources, GRASS_OVERLAY);
+        for (SoilType type : SoilType.values()) {
+            ResourceLocation source = OVERLAY_SOURCES.get(type);
+            BufferedImage image = source == null ? null : read(resources, source);
+            boolean borrowed = image != null;
+            if (image == null) {
+                image = fallback;
+            }
+            if (image == null) {
+                continue;   // no vanilla overlay either: nothing sensible to emit
+            }
+            int width = image.getWidth();
+            int height = image.getHeight();
+            NativeImage copy = new NativeImage(width, height, false);
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    setPixel(copy, x, y, image.getRGB(x, y));
+                }
+            }
+            add(output, TintedSoil.id("block/grass_overlay_" + type.getSerializedName()),
+                    copy, width, height);
+            if (borrowed) {
+                TintedSoil.LOGGER.info("Grass fringe for soil type {} taken from {}",
+                        type.getSerializedName(), source);
+            }
+        }
     }
 
     /**
@@ -284,6 +405,14 @@ public class SoilSpriteSource implements SpriteSource {
 
     private static int clamp(int value) {
         return value < 0 ? 0 : Math.min(value, 255);
+    }
+
+    /** ResourceLocation's public constructor became a factory method in 1.21. */
+    private static ResourceLocation foreign(String namespace, String path) {
+        //? if <1.21 {
+        /*return new ResourceLocation(namespace, path);
+        *///?} else
+        return ResourceLocation.fromNamespaceAndPath(namespace, path);
     }
 
     private static ResourceLocation vanilla(String name) {
