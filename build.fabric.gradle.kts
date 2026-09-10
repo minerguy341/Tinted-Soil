@@ -11,6 +11,18 @@ val requiredJava: JavaVersion = when {
     else -> JavaVersion.VERSION_17
 }
 
+repositories {
+    // Serves the dev-runtime test mods only. The group filters keep Gradle from consulting
+    // either for anything else, so adding them cannot change how a real dependency resolves.
+    maven("https://api.modrinth.com/maven") {
+        name = "Modrinth"
+        content { includeGroup("maven.modrinth") }
+    }
+    mavenCentral {
+        content { includeGroup("com.electronwill.night-config") }
+    }
+}
+
 dependencies {
     /** Pulls only the Fabric API modules actually used, instead of the whole bundle. */
     fun fapi(vararg modules: String) {
@@ -37,6 +49,36 @@ dependencies {
     // above provide, so the dev client needs the umbrella bundle. Runtime-only and dev-only:
     // it stays out of the published jar's metadata.
     modLocalRuntime("net.fabricmc.fabric-api:fabric-api:${sc.properties.get<String>("deps.fabric_api")}")
+
+    // Oh The Biomes We've Gone in the dev client, to look at the blend against a worldgen
+    // mod that mixes its own dirts into vanilla's. Test scaffolding, not a dependency.
+    //
+    // KNOWN BROKEN: reaches worldgen and dies on
+    // `NoSuchMethodError: TerrablenderOverworldBiomeBuilder.method_38185`, an intermediary
+    // name that survived remapping. This project compiles against Mojang mappings, so Loom
+    // remaps every production mod on the way in, and a call inherited from a vanilla
+    // superclass through another mod's class does not resolve. The title screen, resource
+    // load and atlas work fine; creating a world does not.
+    //
+    // Every mod is listed because Modrinth's maven publishes bare jars with no POM, so
+    // nothing resolves transitively.
+    if (sc.current.version == "1.21.1") {
+        modLocalRuntime("maven.modrinth:oh-the-biomes-weve-gone:2.6.0-Fabric")
+        modLocalRuntime("maven.modrinth:corgilib:1.21.1-5.0.0.9-Fabric")
+        // Pinned by Modrinth version id, not number: TerraBlender publishes its Fabric and
+        // NeoForge builds under the same "4.1.0.8", and the maven serves the NeoForge jar.
+        modLocalRuntime("maven.modrinth:terrablender:XNtIBXyQ")  // 4.1.0.8, Fabric
+        // EXPERIMENT: also on the mod compile classpath, so Loom picks up its transitive
+        // access widener and applies it to the Minecraft jar used for remapping.
+        modCompileOnly("maven.modrinth:terrablender:XNtIBXyQ")
+        modLocalRuntime("maven.modrinth:geckolib:4.9.2")
+        modLocalRuntime("maven.modrinth:oh-the-trees-youll-grow:1.21.1-5.3.2-Fabric")
+
+        // TerraBlender and CorgiLib ship NightConfig as a jar-in-jar, which Loom does not
+        // unpack for a runtime-only mod. Plain libraries, not mods, so `runtimeOnly`.
+        runtimeOnly("com.electronwill.night-config:core:3.8.3")
+        runtimeOnly("com.electronwill.night-config:toml:3.8.3")
+    }
 }
 
 loom {
