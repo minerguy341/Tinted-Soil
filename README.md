@@ -1,14 +1,15 @@
 # Tinted Soil
 
-Replaces vanilla and worldgen-mod grass/dirt with biome-tinted blocks, so soil and grass
-blend smoothly across biome borders instead of cutting off at a hard line — which is most
-visible on hills and cliffs, where two soil types meet on a vertical face.
+Retints the soil that is already in your world — vanilla's dirt, coarse dirt, podzol and
+grass blocks, and a worldgen mod's soils alongside them — so that where two soils meet they
+blend into each other instead of cutting off at a hard line. It is most visible on hills and
+cliffs, where a worldgen mod's dirt interleaves with vanilla's block by block down the same
+vertical face.
 
-Everything is driven by **two tint indices**:
-
-- `tintedsoil:tinted_grass_block` — two tints: grass (index 0) and the soil under it (index 1)
-- `tintedsoil:tinted_soil` — one tint: soil (index 1)
-- `tintedsoil:tinted_coarse_soil` — soil tint as above, but grass will not spread onto it
+It adds **no blocks, no items, no tags and no worldgen**, and writes nothing to a world. All
+of it is client-side rendering: the models those blocks resolve to are swapped for retinted
+ones as they load, and a tint provider colours them. Uninstalling it leaves a world exactly
+as it was.
 
 Built with [Stonecutter](https://stonecutter.kikugie.dev/) from a single `src/` tree.
 
@@ -21,195 +22,188 @@ Built with [Stonecutter](https://stonecutter.kikugie.dev/) from a single `src/` 
 ## How the colour works
 
 Block tints are **multiplicative** — the rendered colour is `texel × tint`. Vanilla
-`dirt.png` is already a saturated brown, so no tint can push it toward pale sand; it can
-only be darkened. Tinted Soil therefore does what vanilla does for grass: the texture
-(`textures/block/tinted_soil.png`) is a light, strictly greyscale grain carrying only the
-*pattern*, and all of the colour comes from a colormap
-(`textures/colormap/soil.png`), indexed exactly like vanilla's `grass.png`.
+`dirt.png` is a saturated brown, so no tint applied to it can do anything but darken it.
+Tinted Soil therefore does what vanilla does for grass: it renders soil as a greyscale grain
+carrying only the *pattern*, with all of the colour in the tint.
 
-The base textures are neutral by construction — `R == G == B` for every pixel. Any hue
-baked into a texture would multiply against the tint and pull every biome's soil toward it,
-so the tint is the only thing deciding colour.
+The greyscale is not shipped. It is derived at atlas-stitch time, from whatever textures the
+player's resource packs actually supply, by projecting every pixel onto the texture's own
+average colour — which keeps the grain and discards the hue. Two numbers come out of each
+texture:
 
-The colour model blends four anchors over (temperature, downfall):
+- its **average colour**, which is what a block wearing it renders as; and
+- the **mean luminance** of the greyscale, which the tint is divided by.
 
-| Anchor | Where | Rendered |
-|--------|-------|----------|
-| `TEMPERATE` | plains, forest | `#866043` — vanilla dirt |
-| `HUMID` | jungle, swamp, dark forest | `#684832` |
-| `SAND` | desert, savanna, badlands | `#CEB78A` |
-| `COLD` | snowy and peak biomes | `#928A80` |
+Multiply the greyscale by `average ÷ mean` and you get the original texture back. Measured
+against vanilla's own art, that round trip is exact to about one part in 255:
 
-Sandiness is shaped by `t^1.5 · (1−d)^3` so that merely dry-ish temperate biomes (plains
-sits at downfall 0.4) stay brown and only genuinely rainless hot biomes reach sand.
-Resulting samples:
+| Texture | Average | Mean | Tint | Worst channel error |
+|---------|---------|------|------|---------------------|
+| `dirt` | `#876041` | 0.7232 | `#BA845A` | 9 |
+| `coarse_dirt` | `#78553A` | 0.6436 | `#BA845A` | 6 |
+| `grass_block_side` | `#825C3F` | 0.6974 | `#BA845A` | 9 |
+| BWG `lush_dirt` | `#534031` | 0.6630 | `#7E6049` | 4 |
+| BWG `sandy_dirt` | `#D9CA9D` | 0.8610 | `#FCEBB7` | 20 |
+| BWG `peat` | `#514137` | 0.6607 | `#7B6254` | 8 |
 
-```
-plains        T=0.80 D=0.40  #876749     desert/savanna  T=1.00 D=0.00  #CEB78A
-forest        T=0.70 D=0.80  #72533A     taiga           T=0.25 D=0.80  #826F5E
-jungle        T=0.95 D=0.90  #6B4B30     snowy plains    T=0.00 D=0.50  #928A80
-```
+So **a soil surrounded by its own kind renders exactly as it did**, and the mod only shows
+where two soils meet. The identical tint for dirt, coarse dirt and grass block side is the
+same fact from the other end: they are the same material, and all of the brightness
+difference between dirt and coarse dirt lives in the greyscale.
 
-### Two blends, composed
+Deriving per texture is also what removed the old brightness ceiling. A tint is stored in
+eight bits per channel, so on one shared greyscale no colour brighter than about `#B8B8B8`
+was representable and BWG's pale `#D9CA9D` sandy dirt was unreachable. Tinted on a greyscale
+made from *its own* texture it needs `#FCEBB7`, which fits.
 
-A soil colour has to answer two questions — *where* is this, and *what* is it — and each
-gets its own blend.
+### Pebbles, fringes, and anything that is not soil
 
-**Where: the biome, blended across biomes.** The soil tint goes through a `ColorResolver`,
-so `ClientLevel#getBlockTint` box-blurs it over the player's biome-blend radius, exactly the
-way grass and water are blended. That is what turns a biome border into a gradient. Vanilla
-builds its tint-cache map with a fixed set of resolvers, so `ClientLevelMixin` gives the
-soil resolver a `BlockTintCache` of its own.
+Soil textures are not all soil. Vanilla's dirt has seven grey stones in it; vanilla's
+`grass_block_side` has 61 pixels of grass fringe painted into the top four rows, and Biomes
+O' Plenty paints its origin grass on the same way rather than shipping an overlay. Grey times
+a brown tint is just brown, so tinting those would dissolve them into the ground.
 
-A biome that declares its own `grass_color` has that choice **inherited**: the colour is
-matched back to a cell of vanilla's `grass.png` (`GrassColorIndex` inverts it by search) and
-the soil colormap is sampled at the same cell. The two colormaps share an index space, so
-asking "which climate does this grass *look* like?" makes soil follow whatever art direction
-a biome author chose — Biomes O' Plenty's and BWG's included — with no per-biome data here.
-Biomes without an override fall back to their own climate. The override is read directly
-rather than through `getGrassColor(x, z)`, which would apply swamp's and dark forest's
-positional modifiers and make soil flicker across a biome.
+Every pixel that sits too far off the texture's own hue is therefore pulled out into a second
+sprite and drawn back over the tinted cube **untinted**, by a second element in the model.
+Stones stay stone-coloured in every biome, and a painted-on fringe stays exactly the colour
+its author chose. The test is distance from the hue (0.12), not neutrality: vanilla's pebbles
+happen to be neutral grey but Bare Bones' are `#A09184`, and an `r == g == b` test finds none
+of them.
 
-**What: the soil type, blended across blocks.** Vanilla can only blend tints that are a
-function of `Biome`. Soil type is a property of the *block*, so left alone it would produce
-exactly the hard seam this mod exists to remove — peat meeting sandy soil with a one-pixel
-edge. `SoilTypeBlend` does the equivalent blur in block space: sample the types in a 5×5
-horizontal kernel, mix their colours by how many of each there are, and pull the biome
-colour toward the result. Blocks that are not ours abstain rather than voting for plain
-dirt, so soil meeting stone keeps its character instead of washing out.
+Podzol is the one soil that needs help: vanilla composites its crust into `podzol_side.png`
+rather than shipping an overlay, and the crust is close enough to the dirt hue that only half
+of it separates out. So it is recovered by subtraction instead — keep a pixel where
+`podzol_side` differs from `dirt`, drop it where they agree — and podzol's body stays plain
+dirt, which is what keeps it blending with the ordinary ground it is made of.
 
-The pull is scaled by `SoilTypePalette.STRENGTH` (0.6) and by how much of the neighbourhood
-is typed, so type is a *character on top of* climate rather than a replacement for it — the
-same lush soil still reads colder in a snowy biome than in a jungle. Plain dirt contributes
-nothing at all, which is what keeps ordinary terrain looking exactly as it did.
+### Blending
 
-A peat/plain boundary across the kernel:
+Vanilla can only blend tints that are a function of `Biome`, because that is what
+`ClientLevel#getBlockTint` box-blurs. Which soil a block *is* is a property of the block, so
+left alone it produces exactly the hard seam this mod exists to remove.
 
-```
- 0/25 peat  #876749      15/25 peat  #6C533C
- 5/25 peat  #7E6045      20/25 peat  #634D38
-10/25 peat  #755A40      25/25 peat  #594734
-```
+`SoilBlend` does the equivalent blur in block space: sample the soil in a 5×5×3 kernel around
+the position and average the colours those soils render as. Every soil votes, plain dirt
+included, so the result is a genuine interpolation between two dirts rather than a nudge away
+from a shared base. Blocks that are not soil abstain rather than voting for dirt, so soil
+meeting stone keeps its character instead of washing out. The vertical radius is 1 rather
+than 2 so that a cliff face blends up and down as well as along, without tripling the cost
+again.
 
-> **Performance note.** The block-space blur is `(2r+1)² = 25` block reads per tinted face
-> and, unlike vanilla's biome blur, is **not cached**. That is the known cost of getting
-> smooth type transitions, and it is unprofiled — if it shows up, a per-position cache keyed
-> like `BlockTintCache` is the obvious next step. `SoilTypeBlend.RADIUS` tunes it.
+Because the tint is divided by the *local* block's mean luminance, the average colour a block
+renders is exactly the blended vote — whatever texture it happens to be wearing.
 
-### Retuning it
+> **Performance note.** The block-space blur is `5 × 5 × 3 = 75` block reads per tinted face
+> and, unlike vanilla's biome blur, is **not cached**. That is the known cost of smooth
+> transitions, and it is unprofiled — if it shows up, a per-position cache keyed like
+> `BlockTintCache` is the obvious next step. `SoilBlend.RADIUS` tunes it.
 
-Edit the anchors at the top of `tools/generate_assets.py` and run:
+### The dormant climate path
+
+`SoilColormap`, `GrassColorIndex`, `BiomeMixin` and the `BlockTintCache` that
+`ClientLevelMixin` gives it are a complete second colour model, indexed by (temperature,
+downfall) exactly like vanilla's `grass.png`, in which a biome that declares its own
+`grass_color` has that choice inherited. Nothing calls it: soil colour now comes from the
+blocks around a position rather than from the biome. It is kept because it is the whole
+biome-driven path and reinstating it means blending its result into `TintedSoilColors#soilTint`
+again. `tools/generate_assets.py` still regenerates its colormap.
+
+## What gets retinted
+
+`assets/tintedsoil/soils.json` is the configuration. It names, for each soil block, the
+models it resolves to and the textures on those models that are soil rather than something
+growing on it:
+
+| Block | Votes with | Models replaced |
+|-------|-----------|-----------------|
+| `minecraft:dirt` | `block/dirt` | `block/dirt` |
+| `minecraft:coarse_dirt` | `block/coarse_dirt` | `block/coarse_dirt` |
+| `minecraft:podzol` | `block/dirt` | `block/podzol` |
+| `minecraft:grass_block` | `block/dirt` | `block/grass_block`, `block/grass_block_snow` |
+| `biomeswevegone:lush_dirt` | `block/lush_dirt` | `block/lush_dirt` |
+| `biomeswevegone:sandy_dirt` | `block/sandy_dirt` | `block/sandy_dirt` |
+| `biomeswevegone:peat` | `block/peat` | `block/peat` |
+| `biomeswevegone:lush_grass_block` | `block/lush_dirt` | `block/lush_grass_block`, `…_snowy` |
+| `biomesoplenty:origin_grass_block` | `block/dirt` | `block/origin_grass_block`, `…_snow` |
+
+Every model and texture id is read out of the mod's own jar rather than guessed — Minecraft
+1.21.1, Oh The Biomes We've Gone 2.6.0, Biomes O' Plenty 21.1.0.14. A block votes with the
+texture of the *soil* under it, so a grass block and the dirt beside it agree on the colour
+of the ground.
+
+The file is read with `getResourceStack`, so a resource pack that ships its own copy **adds**
+soils rather than replacing the list. It is a client resource rather than the block tags this
+used to be configured with because models are loaded and the atlas stitched during a resource
+reload, which happens long before the client has been told about a single block tag.
+
+Still excluded: rooted dirt (it drops hanging roots), mycelium (it spreads, and grows
+mushrooms), mud, and BWG's overgrown/podzol dacite.
+
+Every JSON under `assets/` — `soils.json`, the replacement models, the atlas entry — is
+emitted by `tools/generate_assets.py`. Edit the definitions at the top of that file and run:
 
 ```bash
 python3 tools/generate_assets.py
 ```
 
-That regenerates the texture, the colormap, and every JSON resource. The same model is
-mirrored in `SoilColormap#fallbackColor` as a safety net if the colormap image cannot be
-read — keep the two in sync (the constants are named identically in both files).
+## How the models are replaced
 
-Resource packs can override `textures/colormap/soil.png` directly; it reloads with the rest
-of the client's resources.
+`ModelManager#loadBlockModels` reads every model file on the pack stack and hands back a map.
+One mixin injects at its return and swaps the soil entries for models that inherit from the
+generated ones under `assets/tintedsoil/models/block/soil/`. Each replacement mirrors the
+geometry of the model it stands in for, face for face, with two changes: a soil face samples
+the derived greyscale and gains tint index 1, and a second, untinted element draws that
+texture's pebbles back on top.
 
-## What gets replaced
+Substituting the **unbaked** model rather than the baked one is what keeps everything vanilla
+decided about the block. The blockstate file still applies, so dirt still picks one of four
+random rotations and a grass block still switches models when it is snowed on. Nothing in the
+mod knows about blockstates at all.
 
-Replacement is driven by two block tags, applied during world generation:
+`ModelManager#loadBlockModels` is the same private method with the same signature on 1.20.1,
+1.21.1 and 1.21.8, on both loaders, so one injection covers all five build targets. Two
+things about the map it returns changed in 1.21.4 and are branched on: its values went from
+`BlockModel` to `UnbakedModel`, and its keys from the file a model was read from to the
+model's own id.
 
-- `tintedsoil:replaceable_grass` → `tinted_grass_block`
-- `tintedsoil:replaceable_soil` → `tinted_soil`
-- `tintedsoil:replaceable_coarse_soil` → `tinted_coarse_soil` (checked first, so a block in
-  both soil tags ends up coarse)
+### Why a mixin rather than the loaders' model APIs
 
-**These tags are the configuration.** There is no config file: add a modded soil to a tag
-and it starts being replaced; empty a tag with a datapack and that half switches off.
+NeoForge has no hook for unbaked models. `ModelEvent.ModifyBakingResult` hands over models
+that are already baked, so using it would mean rebuilding each block's variant dispatch —
+including dirt's four rotations — by hand, and differently on 21.1 and 21.8. Fabric's
+`fabric-model-loading-api-v1` does have `modifyModelOnLoad`, but it would only cover the
+Fabric half, and its own shape changed across the three versions built here. One mixin
+covers both loaders and preserves blockstate behaviour for free.
 
-Shipped defaults, taken from the mods' own jars rather than guessed:
+Doing it this way removed the mod's dependency on Fabric API entirely: render layers and
+tints go through mixins for the same reason, so there is nothing left on the Fabric side that
+Fabric API supplies.
 
-| Tag | Entries |
-|-----|---------|
-| `replaceable_grass` | `minecraft:grass_block`, `biomesoplenty:origin_grass_block`, `biomeswevegone:lush_grass_block` |
-| `replaceable_soil` | `minecraft:dirt`, `minecraft:podzol`, `biomeswevegone:lush_dirt`, `biomeswevegone:sandy_dirt`, `biomeswevegone:peat` |
-| `replaceable_coarse_soil` | `minecraft:coarse_dirt` |
+### Why not ship model overrides
 
-Modded entries are marked `"required": false`, so the mods are optional at runtime and no
-compile-time dependency on either is needed.
+The obvious alternative is to ship `assets/minecraft/models/block/dirt.json` in the jar and
+let it override vanilla's. A resource pack sits **above** mod resources in the stack, so the
+pack the mod most wants to follow — Bare Bones, say — would silently override the retinted
+models with its own untinted ones and switch the mod off on exactly the setup it was built
+for.
 
-### Soil types
+### Tints, render layers and items
 
-A replaced block records *which* soil it stood in for, in a `soil_type` blockstate property,
-and keeps it for good — long after worldgen has finished. Grass carries the type across as
-it spreads and dies back, so a patch never forgets it was peat just because it lost its
-grass. Assignment is by tag, so a datapack can route a modded soil to whichever type looks
-closest:
-
-| `soil_type` | Sources | Character |
-|-------------|---------|-----------|
-| `default` | everything unlisted | none — the biome colour, untouched |
-| `podzol` | `minecraft:podzol` | dark orange-brown |
-| `lush` | `biomeswevegone:lush_dirt`, `lush_grass_block` | dark, rich |
-| `sandy` | `biomeswevegone:sandy_dirt` | pale and sandy |
-| `peat` | `biomeswevegone:peat` | near-black bog soil |
-| `origin` | `biomesoplenty:origin_grass_block` | warm mid brown |
-
-This is colour only. Behaviour differences live in the blocks: coarse soil is its own block
-because grass must not spread onto it. Breaking and replacing a block loses its type and
-gives you plain soil, as vanilla does with grass.
-
-Coarse dirt and podzol both map to **soil**, not grass: neither has a grass overlay, so
-sending them to the grass block would paint grass over badlands and old-growth taiga floors.
-
-Coarse dirt keeps its own block so that grass will not spread onto it, as in vanilla. That
-also lets it reproduce coarse dirt's exact tag set, `armadillo_spawnable_on` included, and
-lets a hoe turn it back into plain tinted soil rather than straight to farmland. It is a
-third *block*, not a third tint — it uses the same soil tint as everything else.
-
-Podzol has no such block and folds into plain tinted soil, which trades two vanilla
-behaviours for the smoother surface:
-
-- tinted grass now spreads onto ground that used to be podzol, where vanilla grass never
-  could, so old-growth taiga floors green over in time;
-- mushrooms lose podzol's grow-at-any-light-level rule, which keys off
-  `minecraft:mushroom_grow_block`. Adding tinted soil to that tag is *not* the fix — it
-  would let mushrooms grow on every soil block in the world.
-
-Drop `minecraft:podzol` from `replaceable_soil` to get the vanilla behaviour back. Giving
-podzol the same treatment as coarse dirt — its own block — would fix both, at the cost of a
-fourth block.
-
-**Still excluded:** rooted dirt (drops hanging roots), mycelium (spreads, and grows
-mushrooms), mud, and BWG's overgrown/podzol dacite. Add them to the tags if you would
-rather have the smoother surface there too.
-
-Replacement happens in `ProtoChunkMixin`, on `ProtoChunk#setBlockState`. Every worldgen
-path — surface rules, features, carvers, structures, and anything a worldgen mod adds —
-writes through it, which is why Biomes O' Plenty and Oh The Biomes We've Gone are covered
-without the mod knowing anything about them. Only newly generated chunks are affected;
-existing chunks are left alone.
-
-## Inheriting other mods' data
-
-Each replacement joins the vanilla tags of the block it stands in for, read out of the
-1.21.1 client jar: `dirt`, `mineable/shovel`, `sniffer_diggable_block`,
-`convertable_to_mud`, `armadillo_spawnable_on` and the `*_spawnable_on` family. Membership
-in `minecraft:dirt` is the important one — most other tags, and most other mods' data,
-reference it transitively, so nutrient systems and similar tag-driven features apply
-unchanged.
-
-Plain tinted soil deliberately mirrors `dirt` only. Podzol folds into it, and inheriting
-podzol's tags as well would *widen* them rather than preserve behaviour — foxes would spawn
-on all soil, mushrooms would grow on it everywhere.
-
-Interactions vanilla hardcodes in static maps rather than in data are registered in
-`TintedSoilInteractions`: shovel → path for all three, hoe → farmland for grass and soil,
-and hoe → plain soil for coarse, matching vanilla's coarse-dirt-to-dirt behaviour.
-
-Grass spreading needed real code: `SpreadingSnowyDirtBlock#randomTick` hardcodes
-`Blocks.DIRT` and `Blocks.GRASS_BLOCK`, so once a world is made of tinted blocks, vanilla's
-spread would find nothing to grow onto and grass would simply stop spreading.
-`TintedGrassBlock#randomTick` is a faithful port that walks tinted soil instead, calling
-vanilla's own private `canBeGrass`/`canPropagate` through an invoker mixin so the survival
-rules stay identical rather than approximated. It only ever spreads onto `tinted_soil`,
-never `tinted_coarse_soil` — that omission is the whole mechanism keeping coarse soil bare.
+- **Tint index 0 is grass; index 1 is soil.** The mod claims index 1 and nothing else, in a
+  mixin on `BlockColors#getColor`. Registering a `BlockColor` would have replaced whatever
+  provider the block already had — for a modded grass block, that mod's own grass colour —
+  and which of us won would come down to mod initialisation order. Leaving index 0 alone
+  means vanilla still colours grass tops and BWG still colours its lush grass.
+- **Render layer.** Every retinted model draws a transparent layer over a tinted cube, and in
+  the solid layer that alpha is ignored and draws as opaque black. `ItemBlockRenderTypes#getChunkRenderType`
+  is intercepted to put soil in `cutout_mipped`, which is also the layer vanilla already uses
+  for its own grass block. Deciding it there sidesteps the fact that which blocks are soil is
+  not known until `soils.json` has been read, well after both loaders' render-layer registries
+  are meant to be filled in.
+- **Items.** A block item renders the block's model, so it needs the soil tint too, and gets
+  the block's own unblended colour. Before 1.21.4 that is a mixin on `ItemColors#getColor`;
+  from 1.21.4 item tints moved into item model definitions, and vanilla's `items/dirt.json`
+  declares none, so the loaded definitions are walked instead and the missing tint added.
 
 ## Building
 
@@ -218,11 +212,12 @@ never `tinted_coarse_soil` — that omission is the whole mechanism keeping coar
 ./gradlew :1.21.1-fabric:build     # one target
 ```
 
-Jars land in `build/libs/<mod version>/`. Stonecutter 0.9 builds inactive versions from
-generated sources, so `buildAll` needs no version switching.
+`JAVA_HOME` must be a **JDK 21**; 1.20.1 targets Java 17, which the toolchain resolves
+separately. Jars land in `build/libs/<mod version>/`. Stonecutter 0.9 builds inactive
+versions from generated sources, so `buildAll` needs no version switching.
 
 `./gradlew "Tinted Soil:stonecutterSwitchTo1.21.8-fabric"` switches which version your IDE
-resolves against.
+resolves against. Switch back to `1.21.1-fabric` — the VCS version — before committing.
 
 ### Layout
 
@@ -231,7 +226,7 @@ src/                        one shared source tree for all 5 targets
 stonecutter.properties.toml versions and dependency coordinates
 build.fabric.gradle.kts     Fabric buildscript (Loom via loom-back-compat)
 build.neoforge.gradle.kts   NeoForge buildscript (ModDevGradle)
-tools/generate_assets.py    regenerates textures, colormap and all JSON resources
+tools/generate_assets.py    regenerates soils.json, every model, the atlas and the colormap
 ```
 
 Both loaders use **Mojang mappings**, which is what lets one source tree compile for both.
@@ -242,34 +237,28 @@ Handled with Stonecutter conditions rather than parallel source trees:
 
 | Change | Versions | Handling |
 |--------|----------|----------|
-| `new ResourceLocation` → `fromNamespaceAndPath` | 1.21 | `TintedSoil#id` |
-| `Properties.copy` → `ofFullCopy` | 1.21 | `TintedSoilBlocks#copyOf` |
-| Block/item ids move into properties (`setId`) | 1.21.2 | `TintedSoilBlocks` |
-| `Block#codec()` becomes abstract | 1.21 | `TintedGrassBlock` |
-| `ItemColor`/`ItemColors` deleted | 1.21.4 | item model definitions in `assets/tintedsoil/items/` |
-| `tags/blocks` → `tags/block`, `loot_tables` → `loot_table` | 1.21 | both layouts shipped |
-| `match_tool` predicate shape | 1.21 | one form per loot-table folder |
+| `new ResourceLocation` → `fromNamespaceAndPath` | 1.21 | `TintedSoil#location` |
+| `SpriteContents` supplier gains a loader argument | 1.21 | `SoilSpriteSource#add` |
+| `Registry#get` → `getValue` | 1.21.2 | `TintedSoil#block` |
+| `BlockModel` folded into `UnbakedModel`; model map keyed by id | 1.21.4 | `SoilModels` |
+| `ItemColors` deleted, item tints move into item model definitions | 1.21.4 | `SoilItemTints` |
+| `SpriteSourceType` → a codec in a `LateBoundIdMapper` | 1.21.6 | `SoilSpriteSources` |
+| `NativeImage#setPixelRGBA` → `setPixelABGR` | 1.21.6 | `SoilSpriteSource#setPixel` |
+| `RenderType` → `ChunkSectionLayer` | 1.21.6 | `SoilRenderTypeMixin` |
 
-`ProtoChunk#setBlockState`'s third parameter changed from `boolean` to `int`, and
-`ClientLevel`'s constructor changed shape, in this range. Both are avoided rather than
-branched on — `@ModifyVariable(argsOnly = true)` matches the `BlockState` argument by type,
-and the `ClientLevel` hook targets `getBlockTint` instead of the constructor.
-
-Data-folder duplication is intentional: both layouts are generated from one definition in
-`tools/generate_assets.py`, so they cannot drift, and each version ignores the folder it
-does not recognise.
+`ClientLevel`'s constructor changed shape in this range; that is avoided rather than branched
+on, by hooking `getBlockTint` instead.
 
 ### NeoForge on 1.20.1
 
 Not built. `net.neoforged:neoforge` starts at `20.2`; the 1.20.1 fork is published as
 `net.neoforged:forge:1.20.1-47.x` and needs a different toolchain end to end — the
-`net.neoforged.moddev.legacyforge` plugin, `net.minecraftforge.*` package names,
-SRG-named mixin refmaps, and legacy `META-INF/mods.toml`. That is a third buildscript plus a
-third branch of every loader-specific class, for one target.
+`net.neoforged.moddev.legacyforge` plugin, `net.minecraftforge.*` package names, SRG-named
+mixin refmaps, and legacy `META-INF/mods.toml`. That is a third buildscript plus a third
+branch of every loader-specific class, for one target.
 
 To add it: register the node in `settings.gradle.kts` (there is a comment marking the spot),
-add `build.legacyforge.gradle.kts`, and add `legacyforge` variants of the four entrypoint
-classes.
+add `build.legacyforge.gradle.kts`, and add `legacyforge` variants of the entrypoint classes.
 
 ## Licence
 

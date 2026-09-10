@@ -9,8 +9,9 @@ displayName = "${name}"
 version = "${version}"
 authors = "minerguy341"
 description = '''
-Replaces vanilla and worldgen-mod grass/dirt with two biome-tinted blocks, so soil and grass
-blend smoothly across biome borders instead of cutting off hard.
+Retints vanilla and worldgen-mod soil in place -- dirt, coarse dirt, podzol and grass blocks --
+so soil blends smoothly across biome and soil borders instead of cutting off hard. Adds no
+blocks and changes no world data.
 '''
 
 [[mixins]]

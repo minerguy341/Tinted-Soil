@@ -45,19 +45,6 @@ public final class SoilColormap {
         pixels = null;
     }
 
-    /**
-     * The soil colour with no world context: inventory icons, and the fallback when a block
-     * is asked for its tint outside a level.
-     *
-     * <p>Reads the palette rather than the colormap. The colormap is pre-divided by a
-     * build-time luminance, but the texture is now derived at runtime from the player's own
-     * dirt.png, so only a value that goes through {@link #toTint} at read time is consistent
-     * with what is actually on the atlas.
-     */
-    public static int defaultColor() {
-        return SoilTypePalette.tint(com.minerguy341.tintedsoil.block.SoilType.DEFAULT);
-    }
-
     public static int get(double temperature, double downfall) {
         int[] map = pixels;
         if (map == null) {
@@ -124,23 +111,13 @@ public final class SoilColormap {
         return (r << 16) | (g << 8) | b;
     }
 
-    /**
-     * Converts a colour you want to see into the tint that produces it, by dividing out the
-     * greyscale texture's mean luminance. The stored colormap is pre-divided the same way.
-     */
-    public static int toTint(int rendered) {
-        int r = channel((rendered >> 16) & 0xFF);
-        int g = channel((rendered >> 8) & 0xFF);
-        int b = channel(rendered & 0xFF);
-        return (r << 16) | (g << 8) | b;
-    }
-
     private static int channel(double rendered) {
-        // Measured from the soil texture actually on the atlas, which SoilSpriteSource
-        // derives from whatever dirt.png the player's resource packs supply. A darker dirt
-        // needs a brighter tint to land on the same rendered colour, so this cannot be the
-        // compile-time constant it used to be.
-        return Math.min(255, Math.max(0, (int) Math.round(rendered / SoilTextures.meanLuminance())));
+        // The shipped colormap is pre-divided by the luminance vanilla's own dirt.png
+        // derives to, and so is this fallback, so the two agree. A resource pack that
+        // changes dirt's contrast shifts the real figure; this path is dormant, so it is
+        // left on the constant rather than tracking it.
+        return Math.min(255, Math.max(0,
+                (int) Math.round(rendered / SoilTints.DEFAULT_MEAN_LUMINANCE)));
     }
 
     private static double clamp(double value) {

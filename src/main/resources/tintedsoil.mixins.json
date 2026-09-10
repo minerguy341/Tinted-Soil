@@ -8,10 +8,6 @@
   },
   "mixins": [
     "BiomeMixin",
-    "ClimateSettingsMixin",
-    "HoeItemAccessor",
-    "ProtoChunkMixin",
-    "ShovelItemAccessor",
-    "SpreadingSnowyDirtBlockInvoker"
+    "ClimateSettingsMixin"
   ]
 }

@@ -24,30 +24,16 @@ repositories {
 }
 
 dependencies {
-    /** Pulls only the Fabric API modules actually used, instead of the whole bundle. */
-    fun fapi(vararg modules: String) {
-        for (it in modules) modImplementation(fabricApi.module(it, sc.properties["deps.fabric_api"]))
-    }
-
     minecraft("com.mojang:minecraft:${sc.current.version}")
     // Mojang mappings on both loaders, so `src/` compiles unchanged for Fabric and NeoForge.
     loomx.applyMojangMappings()
 
     modImplementation("net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
-    fapi(
-        "fabric-api-base",
-        "fabric-lifecycle-events-v1",
-        "fabric-resource-loader-v0",
-        "fabric-rendering-v1",
-        "fabric-item-group-api-v1",
-    )
 
-    // BlockRenderLayerMap's own module before 1.21.6, folded into fabric-rendering-v1 after.
-    if (sc.current.parsed < "1.21.6") fapi("fabric-blockrenderlayer-v1")
-
-    // `fabric.mod.json` hard-depends on `fabric-api`, an id none of the individual modules
-    // above provide, so the dev client needs the umbrella bundle. Runtime-only and dev-only:
-    // it stays out of the published jar's metadata.
+    // No Fabric API modules. Model replacement, render layers and tints all go through
+    // mixins so that one mechanism covers both loaders, which leaves nothing on the Fabric
+    // side that Fabric API provides -- so the mod does not depend on it at all. The umbrella
+    // bundle is still on the dev classpath because the test mods below need it.
     modLocalRuntime("net.fabricmc.fabric-api:fabric-api:${sc.properties.get<String>("deps.fabric_api")}")
 
     // Oh The Biomes We've Gone in the dev client, to look at the blend against a worldgen

@@ -1,30 +1,27 @@
 package com.minerguy341.tintedsoil.client;
 
-import com.minerguy341.tintedsoil.TintedSoilBlocks;
 import com.minerguy341.tintedsoil.duck.DownfallSource;
-import net.minecraft.client.color.block.BlockColor;
-import net.minecraft.client.renderer.BiomeColors;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.ColorResolver;
-import net.minecraft.world.level.GrassColor;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Tint providers for the two blocks.
+ * The soil tint, for the one index this mod claims.
  *
- * <p>Tint index 0 is grass and reuses vanilla's own grass resolver, so the grass half of a
- * tinted grass block is pixel-identical to {@code minecraft:grass_block}. Tint index 1 is
- * soil and goes through {@link #SOIL_COLOR_RESOLVER}.
+ * <p>Tint index 0 is grass and is left entirely alone: vanilla already uses it for
+ * {@code grass_block}, and a worldgen mod already registers its own provider for its own
+ * grass. Claiming only index 1 is what lets the retinted models keep every grass colour
+ * exactly as its owner meant it, whatever order the mods happened to initialise in.
  *
- * <p>Routing the soil colour through a {@link ColorResolver} rather than sampling the biome
- * at the block position is the whole point of the mod: {@code ClientLevel#getBlockTint}
- * box-blurs the resolver over the player's biome blend radius, which is what turns a hard
- * biome border into a gradient.
+ * <p>The colour itself comes from the blocks around the position rather than from the
+ * biome -- see {@link SoilBlend}. The biome-driven path below is dormant but intact; see
+ * {@link #SOIL_COLOR_RESOLVER}.
  */
 public final class TintedSoilColors {
     public static final int GRASS_TINT_INDEX = 0;
@@ -33,6 +30,17 @@ public final class TintedSoilColors {
     /** Per-biome soil colour, resolved once and reused; cleared with the colormap. */
     private static final Map<Biome, Integer> BIOME_SOIL = new ConcurrentHashMap<>();
 
+    /**
+     * The climate-driven soil colour, blurred across biome borders by
+     * {@code ClientLevel#getBlockTint}.
+     *
+     * <p>Unused: soil colour now comes from the textures of the blocks around a position,
+     * so every vanilla biome renders the same standard dirt and only a worldgen mod's own
+     * soils shift it. This is left in place rather than deleted because it is the whole
+     * biome-driven path -- colormap, climate inversion, per-biome cache and the
+     * {@code BlockTintCache} that {@code ClientLevelMixin} gives it -- and reinstating it
+     * is a matter of blending its result into {@link #soilTint} again.
+     */
     public static final ColorResolver SOIL_COLOR_RESOLVER =
             (biome, x, z) -> BIOME_SOIL.computeIfAbsent(biome, TintedSoilColors::resolveBiomeSoil);
 
@@ -45,7 +53,7 @@ public final class TintedSoilColors {
      * colours on their distinctive biomes, so their soil follows their art direction with no
      * per-biome data on this end. Everything else falls back to the biome's own climate.
      *
-     * <p>The override is read rather than {@code getGrassColor(x, z)} on purpose — the
+     * <p>The override is read rather than {@code getGrassColor(x, z)} on purpose -- the
      * latter applies swamp's and dark forest's positional colour modifiers, which would make
      * soil flicker between shades across a biome.
      */
@@ -74,75 +82,30 @@ public final class TintedSoilColors {
         GrassColorIndex.invalidate();
     }
 
-    public static final BlockColor GRASS_BLOCK_COLOR = (state, view, pos, tintIndex) -> {
-        if (tintIndex == SOIL_TINT_INDEX) {
-            return soilTint(view, pos);
-        }
-        return view != null && pos != null
-                ? BiomeColors.getAverageGrassColor(view, pos)
-                : GrassColor.getDefaultColor();
-    };
-
-    public static final BlockColor SOIL_BLOCK_COLOR = (state, view, pos, tintIndex) -> soilTint(view, pos);
-
-    // 1.21.4 replaced item colour providers with `tints` entries in item model definitions,
-    // and 1.21.8 deleted ItemColor outright, so inventory tinting is data-driven there --
-    // see assets/tintedsoil/items/*.json.
-    //? if <1.21.2 {
-    /** Inventory icons have no world context, so they use the plains entry of the colormap. */
-    public static final net.minecraft.client.color.item.ItemColor GRASS_ITEM_COLOR =
-            (stack, tintIndex) -> tintIndex == SOIL_TINT_INDEX ? SoilColormap.defaultColor() : GrassColor.getDefaultColor();
-
-    public static final net.minecraft.client.color.item.ItemColor SOIL_ITEM_COLOR =
-            (stack, tintIndex) -> SoilColormap.defaultColor();
-    //?}
-
     private TintedSoilColors() {
     }
 
     /**
-     * Soil colour comes from the surrounding soil types alone.
+     * The tint for a soil block's soil faces.
      *
-     * <p>Climate no longer varies it, so every vanilla biome renders the same standard
-     * dirt and only a worldgen mod's own soil blocks shift the colour -- blurred across
-     * block boundaries by {@link SoilTypeBlend} so a mixed cliff face reads as a gradient.
-     *
-     * <p>{@link #SOIL_COLOR_RESOLVER} is therefore unused for now. It is left in place
-     * rather than deleted because it is the whole biome-driven path, and reinstating it is
-     * a matter of passing {@code view.getBlockTint(pos, SOIL_COLOR_RESOLVER)} here again in
-     * place of the constant.
+     * @return the tint, or {@code -1} (no tint) if this block is not soil
      */
-    private static int soilTint(BlockAndTintGetter view, BlockPos pos) {
-        if (view == null || pos == null) {
-            return SoilColormap.defaultColor();
+    public static int soilTint(BlockState state, BlockAndTintGetter view, BlockPos pos) {
+        SoilTints.Soil soil = SoilTints.of(state.getBlock());
+        if (soil == null) {
+            return -1;
         }
-        return SoilTypeBlend.apply(view, pos, SoilColormap.defaultColor());
+        int rendered = view != null && pos != null
+                ? SoilBlend.apply(view, pos, soil.colour())
+                : soil.colour();
+        // Dividing by this block's own mean luminance is what makes the average colour it
+        // renders equal the colour asked for, whichever texture it is wearing.
+        return soil.tintFor(rendered);
     }
 
-    /**
-     * Registers the block providers through whatever callback the loader supplies, so the
-     * Fabric and NeoForge client entrypoints stay down to a couple of lines each.
-     */
-    public static void registerBlockColors(BlockColorRegistrar blocks) {
-        blocks.register(GRASS_BLOCK_COLOR, TintedSoilBlocks.TINTED_GRASS_BLOCK);
-        blocks.register(SOIL_BLOCK_COLOR, TintedSoilBlocks.TINTED_DIRT, TintedSoilBlocks.TINTED_COARSE_DIRT);
-    }
-
-    //? if <1.21.2 {
-    public static void registerItemColors(ItemColorRegistrar items) {
-        items.register(GRASS_ITEM_COLOR, TintedSoilBlocks.TINTED_GRASS_BLOCK_ITEM);
-        items.register(SOIL_ITEM_COLOR, TintedSoilBlocks.TINTED_DIRT_ITEM,
-                TintedSoilBlocks.TINTED_COARSE_DIRT_ITEM);
-    }
-
-    @FunctionalInterface
-    public interface ItemColorRegistrar {
-        void register(net.minecraft.client.color.item.ItemColor color, net.minecraft.world.level.ItemLike... items);
-    }
-    //?}
-
-    @FunctionalInterface
-    public interface BlockColorRegistrar {
-        void register(BlockColor color, net.minecraft.world.level.block.Block... blocks);
+    /** The soil colour with no world context: inventory icons and dropped items. */
+    public static int itemTint(net.minecraft.world.level.block.Block block) {
+        SoilTints.Soil soil = SoilTints.of(block);
+        return soil == null ? -1 : soil.tintFor(soil.colour());
     }
 }

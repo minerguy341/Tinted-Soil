@@ -1,0 +1,68 @@
+{
+  "textures": {
+    "minecraft:block/dirt": {
+      "soil": "tintedsoil:soil/minecraft/block/dirt",
+      "pebbles": "tintedsoil:soil/minecraft/block/dirt_pebbles"
+    },
+    "minecraft:block/coarse_dirt": {
+      "soil": "tintedsoil:soil/minecraft/block/coarse_dirt",
+      "pebbles": "tintedsoil:soil/minecraft/block/coarse_dirt_pebbles"
+    },
+    "minecraft:block/grass_block_side": {
+      "soil": "tintedsoil:soil/minecraft/block/grass_block_side",
+      "pebbles": "tintedsoil:soil/minecraft/block/grass_block_side_pebbles"
+    },
+    "biomeswevegone:block/lush_dirt": {
+      "soil": "tintedsoil:soil/biomeswevegone/block/lush_dirt",
+      "pebbles": "tintedsoil:soil/biomeswevegone/block/lush_dirt_pebbles"
+    },
+    "biomeswevegone:block/sandy_dirt": {
+      "soil": "tintedsoil:soil/biomeswevegone/block/sandy_dirt",
+      "pebbles": "tintedsoil:soil/biomeswevegone/block/sandy_dirt_pebbles"
+    },
+    "biomeswevegone:block/peat": {
+      "soil": "tintedsoil:soil/biomeswevegone/block/peat",
+      "pebbles": "tintedsoil:soil/biomeswevegone/block/peat_pebbles"
+    },
+    "biomeswevegone:block/lush_grass_block_side": {
+      "soil": "tintedsoil:soil/biomeswevegone/block/lush_grass_block_side",
+      "pebbles": "tintedsoil:soil/biomeswevegone/block/lush_grass_block_side_pebbles"
+    },
+    "biomesoplenty:block/origin_grass_block_side": {
+      "soil": "tintedsoil:soil/biomesoplenty/block/origin_grass_block_side",
+      "pebbles": "tintedsoil:soil/biomesoplenty/block/origin_grass_block_side_pebbles"
+    }
+  },
+  "overlays": [
+    {
+      "sprite": "tintedsoil:soil/minecraft/block/podzol_side_crust",
+      "over": "minecraft:block/podzol_side",
+      "under": "minecraft:block/dirt"
+    }
+  ],
+  "models": {
+    "minecraft:block/dirt": "tintedsoil:block/soil/minecraft/dirt",
+    "minecraft:block/coarse_dirt": "tintedsoil:block/soil/minecraft/coarse_dirt",
+    "minecraft:block/podzol": "tintedsoil:block/soil/minecraft/podzol",
+    "minecraft:block/grass_block": "tintedsoil:block/soil/minecraft/grass_block",
+    "minecraft:block/grass_block_snow": "tintedsoil:block/soil/minecraft/grass_block_snow",
+    "biomeswevegone:block/lush_dirt": "tintedsoil:block/soil/biomeswevegone/lush_dirt",
+    "biomeswevegone:block/sandy_dirt": "tintedsoil:block/soil/biomeswevegone/sandy_dirt",
+    "biomeswevegone:block/peat": "tintedsoil:block/soil/biomeswevegone/peat",
+    "biomeswevegone:block/lush_grass_block": "tintedsoil:block/soil/biomeswevegone/lush_grass_block",
+    "biomeswevegone:block/lush_grass_block_snowy": "tintedsoil:block/soil/biomeswevegone/lush_grass_block_snowy",
+    "biomesoplenty:block/origin_grass_block": "tintedsoil:block/soil/biomesoplenty/origin_grass_block",
+    "biomesoplenty:block/origin_grass_block_snow": "tintedsoil:block/soil/biomesoplenty/origin_grass_block_snow"
+  },
+  "blocks": {
+    "minecraft:dirt": "minecraft:block/dirt",
+    "minecraft:coarse_dirt": "minecraft:block/coarse_dirt",
+    "minecraft:podzol": "minecraft:block/dirt",
+    "minecraft:grass_block": "minecraft:block/dirt",
+    "biomeswevegone:lush_dirt": "biomeswevegone:block/lush_dirt",
+    "biomeswevegone:sandy_dirt": "biomeswevegone:block/sandy_dirt",
+    "biomeswevegone:peat": "biomeswevegone:block/peat",
+    "biomeswevegone:lush_grass_block": "biomeswevegone:block/lush_dirt",
+    "biomesoplenty:origin_grass_block": "minecraft:block/dirt"
+  }
+}
